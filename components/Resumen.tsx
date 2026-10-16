@@ -1,0 +1,38 @@
+"use client";
+import { useEffect, useState } from "react";
+import { supabase, type Kiosco } from "@/lib/supabase";
+import { peso } from "@/lib/whatsapp";
+
+type R = { pedidos: number; monto_pedidos: number; fiado_pendiente: number; deudores: number; sellos_semana: number; premios_semana: number; ultimo_ajuste: string | null; productos: number };
+
+export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "precios" | "fiado") => void }) {
+  const [r, setR] = useState<R | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    supabase.rpc("resumen_semana", { p_kiosco: kiosco.id }).then(({ data, error }) => { if (error) setErr(true); else setR(data as R); });
+  }, [kiosco.id]);
+
+  if (err) return <p role="alert" style={{ color: "#c0392b" }}>No pudimos cargar el resumen.</p>;
+  if (!r) return <p className="mut">Cargando…</p>;
+  const dias = r.ultimo_ajuste ? Math.floor((Date.now() - new Date(r.ultimo_ajuste).getTime()) / 86400000) : null;
+  const revisar = r.productos > 0 && (dias === null || dias >= 7);
+  const Fila = ({ n, t }: { n: string | number; t: string }) => (<div className="card row"><span>{t}</span><b style={{ fontSize: 22 }}>{n}</b></div>);
+  return (
+    <>
+      <h2>Últimos 7 días</h2>
+      <Fila n={r.pedidos} t="Pedidos recibidos" />
+      <Fila n={peso(Number(r.monto_pedidos))} t="Monto pedido" />
+      <Fila n={peso(Number(r.fiado_pendiente))} t={`Fiado pendiente (${r.deudores} clientes)`} />
+      <Fila n={r.sellos_semana} t="Sellos entregados" />
+      <Fila n={r.premios_semana} t="Premios canjeados" />
+      {revisar && (
+        <div className="card">
+          <b>¿Revisaste tus precios?</b>
+          <p className="mut">{dias === null ? "Todavía no ajustaste precios." : `Hace ${dias} días que no los ajustás.`} Con inflación se desactualizan rápido.</p>
+          <button onClick={() => onIr("precios")}>Ajustar precios</button>
+        </div>
+      )}
+      {r.deudores > 0 && <button className="sec" onClick={() => onIr("fiado")}>Ver quién me debe</button>}
+    </>
+  );
+}
