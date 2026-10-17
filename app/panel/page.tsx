@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import { normalizarTelefonoAR } from "@/lib/whatsapp";
+import { estadoTienda, textoApertura } from "@/lib/horario";
+import Link from "next/link";
 import Productos from "@/components/Productos";
 import Pedidos from "@/components/Pedidos";
 import Fiado from "@/components/Fiado";
@@ -25,7 +27,7 @@ export default function Panel() {
 
   const cargarKiosco = useCallback(async () => {
     if (!session) return;
-    const { data } = await supabase.from("kioscos").select("id,nombre,slug,whatsapp,direccion,acepta_envio,sellos_por_premio,premio,abierto,horario,pedido_minimo,costo_envio,medios_pago").eq("owner_id", session.user.id).maybeSingle();
+    const { data } = await supabase.from("kioscos").select("id,nombre,slug,whatsapp,direccion,acepta_envio,sellos_por_premio,premio,abierto,horario,pedido_minimo,costo_envio,medios_pago,horario_auto,horarios").eq("owner_id", session.user.id).maybeSingle();
     setKiosco((data as Kiosco) ?? null);
   }, [session]);
   useEffect(() => { cargarKiosco(); }, [cargarKiosco]);
@@ -42,7 +44,7 @@ export default function Panel() {
 }
 
 function CrearKiosco({ userId, onListo }: { userId: string; onListo: () => void }) {
-  const [nombre, setNombre] = useState(""); const [slug, setSlug] = useState(""); const [wa, setWa] = useState(""); const [dir, setDir] = useState(""); const [err, setErr] = useState("");
+  const [nombre, setNombre] = useState(""); const [slug, setSlug] = useState(""); const [wa, setWa] = useState(""); const [dir, setDir] = useState(""); const [err, setErr] = useState(""); const [acepto, setAcepto] = useState(false);
   async function crear() {
     const { error } = await supabase.from("kioscos").insert({ owner_id: userId, nombre, slug, whatsapp: normalizarTelefonoAR(wa), direccion: dir.trim() || null });
     if (error) setErr(error.code === "23505" ? "Ese link ya está usado, probá otro." : "Revisá los datos (el link: minúsculas, números y guiones)."); else onListo();
@@ -55,8 +57,12 @@ function CrearKiosco({ userId, onListo }: { userId: string; onListo: () => void 
       <label>Link de la tienda<input value={slug} onChange={(e) => setSlug(e.target.value)} /></label>
       <label>WhatsApp donde recibís pedidos<input value={wa} onChange={(e) => setWa(e.target.value)} inputMode="tel" /></label>
       <label>Dirección (opcional)<input value={dir} onChange={(e) => setDir(e.target.value)} autoComplete="street-address" /></label>
+      <label className="mut" style={{ display: "block", margin: "8px 0" }}>
+        <input type="checkbox" checked={acepto} onChange={(e) => setAcepto(e.target.checked)} style={{ width: "auto", marginRight: 8 }} />
+        Acepto los <Link href="/terminos" target="_blank">Términos y condiciones</Link> y la <Link href="/privacidad" target="_blank">Política de privacidad</Link>.
+      </label>
       {err && <p role="alert" style={{ color: "#c0392b" }}>{err}</p>}
-      <button disabled={nombre.length < 2 || slug.length < 3 || wa.replace(/\D/g, "").length < 8} onClick={crear}>Crear</button>
+      <button disabled={!acepto || nombre.length < 2 || slug.length < 3 || wa.replace(/\D/g, "").length < 8} onClick={crear}>Crear</button>
     </>
   );
 }
@@ -66,12 +72,20 @@ const TABS: [Tab, string][] = [["pedidos", "Pedidos"], ["productos", "Productos"
 
 function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
   const [tab, setTab] = useState<Tab>("pedidos");
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => { const t = setInterval(() => setAhora(new Date()), 30000); return () => clearInterval(t); }, []);
+  const estado = estadoTienda(kiosco, ahora);
+  const abierta = estado === "abierta";
+  const detalle = estado === "fuera_de_horario" ? `Fuera de horario${textoApertura(kiosco.horarios ?? {}, ahora) ? ` · ${textoApertura(kiosco.horarios, ahora)}` : ""}`
+    : estado === "pausada" ? (kiosco.horario_auto ? "Pausada: no recibe pedidos aunque esté en horario" : "Cerrada") : kiosco.horario_auto ? "Abierta (según tu horario)" : "Abierta";
   return (
     <>
       <div className="row"><h1>{kiosco.nombre}</h1><button className="sec" onClick={() => supabase.auth.signOut()}>Salir</button></div>
       <div className="card row">
-        <span>Tienda: <b className={kiosco.abierto ? "ok" : undefined} style={kiosco.abierto ? undefined : { color: "#c0392b" }}>{kiosco.abierto ? "abierta" : "cerrada"}</b></span>
-        <button className="sec" onClick={async () => { await supabase.from("kioscos").update({ abierto: !kiosco.abierto }).eq("id", kiosco.id); recargar(); }}>{kiosco.abierto ? "Cerrar" : "Abrir"}</button>
+        <span>Tienda: <b className={abierta ? "ok" : undefined} style={abierta ? undefined : { color: "#c0392b" }}>{detalle}</b></span>
+        <button className="sec" onClick={async () => { await supabase.from("kioscos").update({ abierto: !kiosco.abierto }).eq("id", kiosco.id); recargar(); }}>
+          {kiosco.horario_auto ? (kiosco.abierto ? "Pausar" : "Reanudar") : kiosco.abierto ? "Cerrar" : "Abrir"}
+        </button>
       </div>
       <QrKiosco slug={kiosco.slug} nombre={kiosco.nombre} />
       <div className="tabs">

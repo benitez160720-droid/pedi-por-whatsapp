@@ -20,3 +20,5 @@ input, select, textarea { width:100%; padding:12px; font-size:18px; border-radiu
 .chips button { white-space:nowrap; padding:6px 12px; font-size:15px; flex:none; }
 .sticky { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:8px; }
 .ok { color:var(--acc); }
+a { color:var(--acc); }
+a.btn { color:#fff; } a.btn.sec { color:var(--fg); }

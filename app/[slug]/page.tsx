@@ -18,8 +18,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
 export default async function TiendaPage({ params }: { params: { slug: string } }) {
   const sb = cliente();
-  const { data: kiosco } = await sb.from("kioscos").select("id,nombre,slug,whatsapp,direccion,acepta_envio,abierto,horario,pedido_minimo,costo_envio,medios_pago").eq("slug", params.slug).maybeSingle();
+  const { data: kiosco } = await sb.from("kioscos").select("id,nombre,slug,whatsapp,direccion,acepta_envio,abierto,horario,pedido_minimo,costo_envio,medios_pago,horario_auto,horarios").eq("slug", params.slug).maybeSingle();
   if (!kiosco) notFound();
-  const { data: productos } = await sb.from("productos").select("id,kiosco_id,barcode,nombre,categoria,precio,disponible").eq("kiosco_id", kiosco.id).eq("disponible", true).order("categoria").order("nombre").limit(2000);
+  const { data: productos } = await sb.from("productos").select("id,kiosco_id,barcode,nombre,categoria,precio,disponible,imagen_url").eq("kiosco_id", kiosco.id).eq("disponible", true).order("categoria").order("nombre").limit(2000);
   return <Tienda kiosco={kiosco as Kiosco} productos={(productos ?? []) as Producto[]} />;
 }

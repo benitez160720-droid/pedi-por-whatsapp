@@ -1,0 +1,21 @@
+// Prueba del parser de planillas: node tests/importar.test.mjs  (o: npm run test:importar)
+import ts from "typescript";
+import { readFileSync } from "node:fs";
+const cargar = (f) => ts.transpileModule(readFileSync(new URL(`../lib/${f}.ts`, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
+const ean = cargar("ean");
+const imp = cargar("importar").replace('from "./ean"', `from "data:text/javascript;base64,${Buffer.from(ean).toString("base64")}"`);
+const { parsePrecio, parsePlanilla } = await import("data:text/javascript;base64," + Buffer.from(imp).toString("base64"));
+let fallos = 0;
+const eq = (n, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fallos++; console.log("FALLA", n, JSON.stringify(a), "!=", JSON.stringify(b)); } };
+for (const [t, v] of [["2.485", 2485], ["2485,50", 2485.5], ["$ 1.250,5", 1250.5], ["12.5", 12.5], ["1,250.50", 1250.5], ["1.000.000", 1000000], ["abc", null], ["", null], ["-5", null], ["0", 0]]) eq(`precio ${t}`, parsePrecio(t), v);
+const txt = ["Nombre;Precio;Categoría;Código", "coca-cola 2,25 L;3.500;bebidas;7790895000782", "Alfajor  triple\t900\tGolosinas", "sin precio;abc", "x;100", "Coca-Cola 2,25 l;3600", "Chicles;350,5"].join("\r\n");
+const r = parsePlanilla(txt, new Set(["pan lactal"]), new Set());
+eq("filas", r.filas.map((f) => [f.nombre, f.precio, f.categoria]), [["Coca-cola 2,25 L", 3500, "Bebidas"], ["Alfajor triple", 900, "Golosinas"], ["Chicles", 350.5, "General"]]);
+eq("errores", r.errores.map((e) => e.linea), [4, 5]);
+eq("duplicados", r.duplicados, 1);
+eq("existente", parsePlanilla("Pan lactal;1000", new Set(["pan lactal"]), new Set()).duplicados, 1);
+const big = parsePlanilla(Array.from({ length: 600 }, (_, i) => `P${i} prod;${i + 1}`).join("\n"), new Set(), new Set());
+eq("tope filas", big.filas.length, 500);
+eq("tope aviso", big.errores.length, 1);
+console.log(fallos ? `${fallos} fallos` : "importar: todo OK");
+process.exit(fallos ? 1 : 0);
