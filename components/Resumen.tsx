@@ -2,14 +2,29 @@
 import { useEffect, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import { peso } from "@/lib/whatsapp";
+import ProductosModificados from "@/components/ProductosModificados";
 
 type R = { pedidos: number; monto_pedidos: number; fiado_pendiente: number; deudores: number; sellos_semana: number; premios_semana: number; ultimo_ajuste: string | null; productos: number };
 
-export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "precios" | "fiado") => void }) {
+export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "precios" | "fiado" | "reponer") => void }) {
   const [r, setR] = useState<R | null>(null);
   const [err, setErr] = useState(false);
+  const [stock, setStock] = useState<{ agotados: number; bajos: number; plata: number } | null>(null);
+  const [vencido, setVencido] = useState<{ clientes: number; monto: number } | null>(null);
   useEffect(() => {
     supabase.rpc("resumen_semana", { p_kiosco: kiosco.id }).then(({ data, error }) => { if (error) setErr(true); else setR(data as R); });
+  }, [kiosco.id]);
+  useEffect(() => {
+    supabase.rpc("fiado_vencido", { p_kiosco: kiosco.id, p_dias: 30 }).then(({ data }) => {
+      const d = data as Record<string, number> | null;
+      if (d) setVencido({ clientes: Number(d.clientes), monto: Number(d.monto) });
+    });
+  }, [kiosco.id]);
+  useEffect(() => {
+    supabase.rpc("reposicion_resumen", { p_kiosco: kiosco.id }).then(({ data }) => {
+      const d = data as Record<string, number> | null;
+      if (d) setStock({ agotados: Number(d.agotados), bajos: Number(d.bajos), plata: Number(d.plata_en_stock) });
+    });
   }, [kiosco.id]);
 
   if (err) return <p role="alert" style={{ color: "#c0392b" }}>No pudimos cargar el resumen.</p>;
@@ -25,6 +40,27 @@ export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "p
       <Fila n={peso(Number(r.fiado_pendiente))} t={`Fiado pendiente (${r.deudores} clientes)`} />
       <Fila n={r.sellos_semana} t="Sellos entregados" />
       <Fila n={r.premios_semana} t="Premios canjeados" />
+      {vencido && vencido.clientes > 0 && (
+        <div className="card">
+          <b>Fiado para cobrar</b>
+          <p className="mut">{vencido.clientes} cliente{vencido.clientes === 1 ? "" : "s"} debe{vencido.clientes === 1 ? "" : "n"} {peso(vencido.monto)} hace más de 30 días</p>
+          <button onClick={() => onIr("fiado")}>Ver quién me debe</button>
+        </div>
+      )}
+      {stock && stock.plata > 0 && (
+        <div className="card">
+          <b>Dinero parado en mercadería</b>
+          <p className="mut">{peso(stock.plata)} entre stock y último costo</p>
+          <button className="sec" onClick={() => onIr("reponer")}>Ver para reponer</button>
+        </div>
+      )}
+      {stock && stock.agotados + stock.bajos > 0 && (
+        <div className="card">
+          <b>Hay mercadería para reponer</b>
+          <p className="mut">{stock.agotados} agotado{stock.agotados === 1 ? "" : "s"} · {stock.bajos} por acabarse</p>
+          <button onClick={() => onIr("reponer")}>Ver qué pedir</button>
+        </div>
+      )}
       {revisar && (
         <div className="card">
           <b>¿Revisaste tus precios?</b>
@@ -33,6 +69,7 @@ export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "p
         </div>
       )}
       {r.deudores > 0 && <button className="sec" onClick={() => onIr("fiado")}>Ver quién me debe</button>}
+      <ProductosModificados kiosco={kiosco} />
     </>
   );
 }

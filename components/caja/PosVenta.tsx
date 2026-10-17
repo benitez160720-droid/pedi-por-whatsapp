@@ -16,6 +16,7 @@ import Escaner from "../Escaner";
 import VincularCelular from "./VincularCelular";
 import { useVinculoCelular } from "./useVinculoCelular";
 import CobroModal from "./CobroModal";
+import CargaStockRapida from "./CargaStockRapida";
 import Ticket, { type TicketData } from "./Ticket";
 
 type Espera = { id: number; at: number; lineas: LineaCarrito[]; descPct: string; cliente: Cliente | null };
@@ -47,6 +48,12 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
   const [ayuda, setAyuda] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
   const [msg, setMsg] = useState("");
+  // Producto que se quedó sin stock en el último intento (ofrece "Cargar stock" sin perder el carrito).
+  const [faltante, setFaltante] = useState<ProductoPos | null>(null);
+  const [cargando, setCargando] = useState<ProductoPos | null>(null);
+  // Stock cargado desde la caja después de la última lectura de productos (la lista del padre todavía no lo tiene).
+  const sumadosRef = useRef<Record<string, number>>({});
+  useEffect(() => { sumadosRef.current = {}; }, [productos]);
   const [pesando, setPesando] = useState<ProductoPos | null>(null);
   const [gramosTxt, setGramosTxt] = useState("");
   const [pendientes, setPendientes] = useState(0);
@@ -78,7 +85,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
   useEffect(() => { setPremio(null); if (cliente) setAvisoFid(""); }, [cliente?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const refrescarCola = useCallback(() => { setPendientes(cola.pendientes().length); setRechazadas(cola.rechazadas().map((v) => ({ offline_id: v.offline_id, total: v.total, motivo: v.motivo, fecha: v.fecha }))); }, [cola]);
   // Lo vendido sin conexión y aún no sincronizado ya no está disponible en el stock local.
-  const stockLibre = useCallback((p: { id: string; stock: number }) => p.stock - (cola.reservado()[p.id] ?? 0), [cola]);
+  const stockLibre = useCallback((p: { id: string; stock: number }) => p.stock + (sumadosRef.current[p.id] ?? 0) - (cola.reservado()[p.id] ?? 0), [cola]);
   const porId = useMemo(() => new Map(productos.map((p) => [p.id, p])), [productos]);
   const favs = useMemo(() => favoritos.map((id) => porId.get(id)).filter((p): p is ProductoPos => !!p && p.disponible), [favoritos, porId]);
 
@@ -97,7 +104,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
 
   /** Suma un producto. Por peso: `gramos` (de la balanza o del cuadro de peso); por unidad: 1. */
   const agregar = useCallback((p: ProductoPos, gramos?: number) => {
-    setMsg("");
+    setMsg(""); setFaltante(null);
     if (p.vendido_por_peso && !gramos) { setPesando(p); setGramosTxt(""); return; }
     const suma = p.vendido_por_peso ? (gramos as number) : 1;
     const tope = p.vendido_por_peso ? 99999 : 99;
@@ -106,7 +113,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
     const i = ls.findIndex((l) => l.producto_id === p.id);
     const actual = i >= 0 ? ls[i].cantidad : 0;
     if (actual + suma > tope) return error(p.vendido_por_peso ? "Máximo 99,999 kg por producto." : "Máximo 99 unidades por producto.");
-    if (p.stock_controlado && !p.permite_sin_stock && actual + suma > libre) return error(`Sin stock suficiente de ${p.nombre} (quedan ${p.vendido_por_peso ? formatoPeso(Math.max(0, libre)) : Math.max(0, libre)}).`);
+    if (p.stock_controlado && !p.permite_sin_stock && actual + suma > libre) { setFaltante(p); return error(`Sin stock suficiente de ${p.nombre} (quedan ${p.vendido_por_peso ? formatoPeso(Math.max(0, libre)) : Math.max(0, libre)}).`); }
     const nuevo = i >= 0
       ? ls.map((l, k) => (k === i ? { ...l, cantidad: l.cantidad + suma } : l))
       : [...ls, { producto_id: p.id, nombre: p.nombre, categoria: p.categoria, precio: p.precio, cantidad: suma, stock_controlado: p.stock_controlado, stock: libre, por_peso: p.vendido_por_peso, descuento_pct: 0, permite_sin_stock: p.permite_sin_stock }];
@@ -386,6 +393,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
           )}
         </div>
         {msg && <p className="pos-error" role="alert">{msg}</p>}
+        {faltante && !cargando && <button className="sec" style={{ marginBottom: 8 }} onClick={() => setCargando(faltante)}>Cargar stock de {faltante.nombre} ahora</button>}
         {favs.length > 0 && (
           <div className="pos-favoritos" aria-label="Favoritos">
             {favs.map((p) => (<button type="button" key={p.id} className="pos-fav" onClick={() => agregar(p)}><span>{p.nombre}</span><b className="mono">{peso(p.precio)}</b></button>))}
@@ -506,6 +514,16 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
               <button onClick={() => { const g = Math.round(Number(gramosTxt)); if (g >= 1 && g <= 99999) agregar(pesando, g); else error("Ingresá un peso entre 1 y 99.999 g."); }}>Agregar <kbd>Enter</kbd></button></div>
           </div>
         </div>
+      )}
+      {cargando && (
+        <CargaStockRapida kioscoId={kiosco.id} producto={cargando} onCancelar={() => setCargando(null)}
+          onCargado={(cant) => {
+            const p = cargando;
+            sumadosRef.current[p.id] = (sumadosRef.current[p.id] ?? 0) + cant;
+            setLineas((ls) => ls.map((l) => (l.producto_id === p.id ? { ...l, stock: l.stock + cant } : l)));
+            setCargando(null); setFaltante(null);
+            agregar(p); // vuelve al carrito; por peso abre el cuadro de peso
+          }} />
       )}
       {cobrando && <CobroModal total={tot.total} cliente={cliente} onCancelar={() => { setCobrando(false); inputProd.current?.focus(); }} onConfirmar={confirmarCobro} />}
       {ticket && <Ticket t={ticket} ancho={config.ticket_ancho} onCerrar={() => { setTicket(null); setTimeout(() => inputProd.current?.focus(), 0); }} />}

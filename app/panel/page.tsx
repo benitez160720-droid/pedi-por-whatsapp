@@ -11,11 +11,16 @@ import Fiado from "@/components/Fiado";
 import Sellos from "@/components/Sellos";
 import Precios from "@/components/Precios";
 import Proveedores from "@/components/Proveedores";
+import Reponer from "@/components/Reponer";
+import BannerReponer from "@/components/BannerReponer";
+import Conteo from "@/components/Conteo";
+import type { LineaCompra } from "@/lib/compras";
 import Etiquetas from "@/components/Etiquetas";
 import type { Seleccion } from "@/lib/etiquetas";
 import Avisos from "@/components/Avisos";
 import Caja from "@/components/Caja";
 import Resumen from "@/components/Resumen";
+import Radar from "@/components/Radar";
 import QrKiosco from "@/components/QrKiosco";
 import MiKiosco from "@/components/MiKiosco";
 
@@ -72,7 +77,7 @@ function CrearKiosco({ userId, onListo }: { userId: string; onListo: () => void 
   );
 }
 
-type Tab = "pedidos" | "productos" | "fiado" | "caja" | "sellos" | "precios" | "proveedores" | "etiquetas" | "resumen" | "local";
+type Tab = "pedidos" | "productos" | "fiado" | "caja" | "sellos" | "precios" | "proveedores" | "reponer" | "conteo" | "etiquetas" | "resumen" | "radar" | "local";
 type Grupo = { titulo: string; items: [Tab, string, string][] };
 // Ícono (trazo) por sección, para el menú lateral.
 const ICONOS: Record<Tab, string> = {
@@ -81,6 +86,9 @@ const ICONOS: Record<Tab, string> = {
   fiado: "M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3zM8 9h8M8 13h5",
   productos: "M21 16V8l-9-5-9 5v8l9 5zM3.3 7.5 12 12.5l8.7-5M12 22V12.5",
   proveedores: "M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10",
+  reponer: "M3 3v18h18M7 14l4-4 3 3 5-6",
+  radar: "M12 12m-9 0a9 9 0 1 0 18 0 9 9 0 1 0-18 0M12 12m-5 0a5 5 0 1 0 10 0 5 5 0 1 0-10 0M12 12l6-6",
+  conteo: "M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h9",
   etiquetas: "M3 6h2v12H3zM7 6h1v12H7zM10 6h3v12h-3zM15 6h1v12h-1zM18 6h3v12h-3z",
   precios: "M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2.8 12.8A2 2 0 0 1 2.2 11.4l.5-7.7a1 1 0 0 1 1-1l7.7-.5a2 2 0 0 1 1.4.6l7.8 7.8a2 2 0 0 1 0 2.8zM7.5 7.5h.01",
   sellos: "M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z",
@@ -89,13 +97,16 @@ const ICONOS: Record<Tab, string> = {
 };
 const GRUPOS: Grupo[] = [
   { titulo: "Vender", items: [["caja", "Caja", "Punto de venta"], ["pedidos", "Pedidos", "WhatsApp y tienda"], ["fiado", "Fiado", "Cuentas corrientes"]] },
-  { titulo: "Catálogo", items: [["productos", "Productos", "Stock y fotos"], ["precios", "Precios", "Ajustes masivos"], ["proveedores", "Proveedores", "Compras y stock"], ["etiquetas", "Etiquetas", "Precios con código"]] },
-  { titulo: "Negocio", items: [["resumen", "Resumen", "Ventas y balance"], ["sellos", "Sellos", "Fidelización"], ["local", "Mi local", "Datos y horarios"]] },
+  { titulo: "Catálogo", items: [["productos", "Productos", "Stock y fotos"], ["precios", "Precios", "Ajustes masivos"], ["reponer", "Para reponer", "Qué pedir y a quién"], ["conteo", "Conteo", "Contar en planilla"], ["proveedores", "Proveedores", "Compras y stock"], ["etiquetas", "Etiquetas", "Precios con código"]] },
+  { titulo: "Negocio", items: [["resumen", "Resumen", "Ventas y balance"], ["radar", "Radar", "Fuga, avisos y vencimientos"], ["sellos", "Sellos", "Fidelización"], ["local", "Mi local", "Datos y horarios"]] },
 ];
 
 function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
   const [tab, setTab] = useState<Tab>("pedidos");
+  // Los avisos push abren /panel?tab=reponer, ?tab=fiado o ?tab=radar (se lee al montar para no romper el render del servidor).
+  useEffect(() => { const t = new URLSearchParams(location.search).get("tab"); if (t === "reponer" || t === "fiado" || t === "radar") setTab(t); }, []);
   const [precarga, setPrecarga] = useState<Seleccion[] | null>(null);
+  const [precargaCompra, setPrecargaCompra] = useState<{ proveedorId: string; lineas: LineaCompra[] } | null>(null);
   const [ahora, setAhora] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setAhora(new Date()), 30000); return () => clearInterval(t); }, []);
   const estado = estadoTienda(kiosco, ahora);
@@ -134,6 +145,7 @@ function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
           <>
             <div className="card row"><span>Tienda: <b className={abierta ? "ok" : undefined} style={abierta ? undefined : { color: "#c0392b" }}>{detalle}</b></span></div>
             <Avisos kiosco={kiosco} />
+            {tab !== "reponer" && <BannerReponer kiosco={kiosco} onIr={() => setTab("reponer")} />}
             <QrKiosco slug={kiosco.slug} nombre={kiosco.nombre} />
           </>
         )}
@@ -143,9 +155,12 @@ function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
         {tab === "caja" && <Caja kiosco={kiosco} />}
         {tab === "sellos" && <Sellos kiosco={kiosco} />}
         {tab === "precios" && <Precios kiosco={kiosco} />}
-        {tab === "proveedores" && <Proveedores kiosco={kiosco} onEtiquetas={(sel) => { setPrecarga(sel); setTab("etiquetas"); }} />}
+        {tab === "conteo" && <Conteo kiosco={kiosco} />}
+        {tab === "reponer" && <Reponer kiosco={kiosco} onComprar={(proveedorId, lineas) => { setPrecargaCompra({ proveedorId, lineas }); setTab("proveedores"); }} />}
+        {tab === "proveedores" && <Proveedores kiosco={kiosco} precarga={precargaCompra} onPrecargaUsada={() => setPrecargaCompra(null)} onEtiquetas={(sel) => { setPrecarga(sel); setTab("etiquetas"); }} />}
         {tab === "etiquetas" && <Etiquetas kiosco={kiosco} precarga={precarga} onPrecargaUsada={() => setPrecarga(null)} />}
         {tab === "resumen" && <Resumen kiosco={kiosco} onIr={setTab} />}
+        {tab === "radar" && <Radar kiosco={kiosco} />}
         {tab === "local" && <MiKiosco kiosco={kiosco} onGuardado={recargar} />}
       </section>
     </div>

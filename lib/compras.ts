@@ -1,7 +1,7 @@
 // Proveedores y compras (0015). El cálculo espeja a registrar_compra: por peso la cantidad va en gramos y el costo es por kg.
 export type Proveedor = { id: string; nombre: string; telefono: string | null; cuit: string | null; notas: string | null; activo: boolean; saldo: number; ultimo_movimiento: string | null };
 export type LineaCompra = { producto_id: string; nombre: string; por_peso: boolean; cantidad: number; costo: number };
-export type MovStock = { id: string; tipo: "compra" | "anulacion_compra" | "ajuste"; cantidad: number; stock_resultante: number; motivo: string | null; created_at: string; productos: { nombre: string; vendido_por_peso: boolean } | null };
+export type MovStock = { id: string; tipo: string; cantidad: number; stock_resultante: number; motivo: string | null; motivo_tipo?: string | null; created_at: string; productos: { nombre: string; vendido_por_peso: boolean } | null };
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 export const totalLinea = (l: Pick<LineaCompra, "por_peso" | "cantidad" | "costo">) => r2(l.por_peso ? (l.costo * l.cantidad) / 1000 : l.costo * l.cantidad);
