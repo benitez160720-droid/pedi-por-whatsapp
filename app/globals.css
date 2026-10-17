@@ -16,3 +16,7 @@ input, select, textarea { width:100%; padding:12px; font-size:18px; border-radiu
 .bar > div { max-width:640px; margin:0 auto; }
 .tag { font-size:13px; padding:2px 8px; border-radius:99px; border:1px solid var(--bd); }
 .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; } .tabs button { padding:8px 12px; font-size:16px; }
+.chips { display:flex; gap:6px; overflow-x:auto; padding:4px 0 8px; -webkit-overflow-scrolling:touch; }
+.chips button { white-space:nowrap; padding:6px 12px; font-size:15px; flex:none; }
+.sticky { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:8px; }
+.ok { color:var(--acc); }

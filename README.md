@@ -33,3 +33,8 @@ Proyecto Supabase `pedi-por-whatsapp` (ref `ydhdbkkubllfdksusyil`, sa-east-1). M
 1. Authentication → Providers → Google: activar con tu Client ID/Secret de Google Cloud.
 2. Authentication → URL Configuration: Site URL = tu dominio de Vercel; Redirect URLs: `http://localhost:3000/panel` y `https://<tu-dominio>/panel`.
 3. En Vercel: cargar `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+
+## v0.5 (Etapa 3) — operación diaria
+- `0004_operacion_kiosco.sql`: tienda abierta/cerrada, horario, pedido mínimo, costo de envío, medios de pago; `crear_pedido` con límite anti-spam (3 pedidos/teléfono y 30/local cada 10 min) y devuelve el número de pedido. **Aplicar en el SQL Editor de Supabase ANTES de subir el código nuevo.**
+- Tests: `supabase/tests/etapa3_test.py` (15 chequeos sobre 0001–0004).
+- Límite: el tope por teléfono se esquiva cambiando de número; el tope por local acota el daño (30 cada 10 min).

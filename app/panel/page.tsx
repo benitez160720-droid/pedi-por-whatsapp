@@ -10,6 +10,7 @@ import Sellos from "@/components/Sellos";
 import Precios from "@/components/Precios";
 import Resumen from "@/components/Resumen";
 import QrKiosco from "@/components/QrKiosco";
+import MiKiosco from "@/components/MiKiosco";
 
 export default function Panel() {
   const [session, setSession] = useState<Session | null>(null);
@@ -24,7 +25,7 @@ export default function Panel() {
 
   const cargarKiosco = useCallback(async () => {
     if (!session) return;
-    const { data } = await supabase.from("kioscos").select("id,nombre,slug,whatsapp,direccion,acepta_envio,sellos_por_premio,premio").eq("owner_id", session.user.id).maybeSingle();
+    const { data } = await supabase.from("kioscos").select("id,nombre,slug,whatsapp,direccion,acepta_envio,sellos_por_premio,premio,abierto,horario,pedido_minimo,costo_envio,medios_pago").eq("owner_id", session.user.id).maybeSingle();
     setKiosco((data as Kiosco) ?? null);
   }, [session]);
   useEffect(() => { cargarKiosco(); }, [cargarKiosco]);
@@ -37,13 +38,13 @@ export default function Panel() {
     </>
   );
   if (!kiosco) return <CrearKiosco userId={session.user.id} onListo={cargarKiosco} />;
-  return <Dueno kiosco={kiosco} />;
+  return <Dueno kiosco={kiosco} recargar={cargarKiosco} />;
 }
 
 function CrearKiosco({ userId, onListo }: { userId: string; onListo: () => void }) {
-  const [nombre, setNombre] = useState(""); const [slug, setSlug] = useState(""); const [wa, setWa] = useState(""); const [err, setErr] = useState("");
+  const [nombre, setNombre] = useState(""); const [slug, setSlug] = useState(""); const [wa, setWa] = useState(""); const [dir, setDir] = useState(""); const [err, setErr] = useState("");
   async function crear() {
-    const { error } = await supabase.from("kioscos").insert({ owner_id: userId, nombre, slug, whatsapp: normalizarTelefonoAR(wa) });
+    const { error } = await supabase.from("kioscos").insert({ owner_id: userId, nombre, slug, whatsapp: normalizarTelefonoAR(wa), direccion: dir.trim() || null });
     if (error) setErr(error.code === "23505" ? "Ese link ya está usado, probá otro." : "Revisá los datos (el link: minúsculas, números y guiones)."); else onListo();
   }
   const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
@@ -53,20 +54,25 @@ function CrearKiosco({ userId, onListo }: { userId: string; onListo: () => void 
       <label>Nombre<input value={nombre} onChange={(e) => { setNombre(e.target.value); setSlug(slugify(e.target.value)); }} /></label>
       <label>Link de la tienda<input value={slug} onChange={(e) => setSlug(e.target.value)} /></label>
       <label>WhatsApp donde recibís pedidos<input value={wa} onChange={(e) => setWa(e.target.value)} inputMode="tel" /></label>
+      <label>Dirección (opcional)<input value={dir} onChange={(e) => setDir(e.target.value)} autoComplete="street-address" /></label>
       {err && <p role="alert" style={{ color: "#c0392b" }}>{err}</p>}
       <button disabled={nombre.length < 2 || slug.length < 3 || wa.replace(/\D/g, "").length < 8} onClick={crear}>Crear</button>
     </>
   );
 }
 
-type Tab = "pedidos" | "productos" | "fiado" | "sellos" | "precios" | "resumen";
-const TABS: [Tab, string][] = [["pedidos", "Pedidos"], ["productos", "Productos"], ["fiado", "Fiado"], ["sellos", "Sellos"], ["precios", "Precios"], ["resumen", "Resumen"]];
+type Tab = "pedidos" | "productos" | "fiado" | "sellos" | "precios" | "resumen" | "local";
+const TABS: [Tab, string][] = [["pedidos", "Pedidos"], ["productos", "Productos"], ["fiado", "Fiado"], ["sellos", "Sellos"], ["precios", "Precios"], ["resumen", "Resumen"], ["local", "Mi local"]];
 
-function Dueno({ kiosco }: { kiosco: Kiosco }) {
+function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
   const [tab, setTab] = useState<Tab>("pedidos");
   return (
     <>
       <div className="row"><h1>{kiosco.nombre}</h1><button className="sec" onClick={() => supabase.auth.signOut()}>Salir</button></div>
+      <div className="card row">
+        <span>Tienda: <b className={kiosco.abierto ? "ok" : undefined} style={kiosco.abierto ? undefined : { color: "#c0392b" }}>{kiosco.abierto ? "abierta" : "cerrada"}</b></span>
+        <button className="sec" onClick={async () => { await supabase.from("kioscos").update({ abierto: !kiosco.abierto }).eq("id", kiosco.id); recargar(); }}>{kiosco.abierto ? "Cerrar" : "Abrir"}</button>
+      </div>
       <QrKiosco slug={kiosco.slug} nombre={kiosco.nombre} />
       <div className="tabs">
         {TABS.map(([k, label]) => (<button key={k} className={tab === k ? "" : "sec"} onClick={() => setTab(k)}>{label}</button>))}
@@ -77,6 +83,7 @@ function Dueno({ kiosco }: { kiosco: Kiosco }) {
       {tab === "sellos" && <Sellos kiosco={kiosco} />}
       {tab === "precios" && <Precios kiosco={kiosco} />}
       {tab === "resumen" && <Resumen kiosco={kiosco} onIr={setTab} />}
+      {tab === "local" && <MiKiosco kiosco={kiosco} onGuardado={recargar} />}
     </>
   );
 }
