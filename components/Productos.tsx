@@ -1,11 +1,16 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
-import { aportarAGlobal, buscarPorBarcode } from "@/lib/barcode";
+import { aportarAGlobal, buscarPorBarcode, esCodigoValido } from "@/lib/barcode";
 import { peso } from "@/lib/whatsapp";
 import Escaner from "./Escaner";
 
 const num = (s: string) => Number(s.replace(",", "."));
+const capitalizar = (s: string) => { const t = s.trim().replace(/\s+/g, " "); return t ? t[0].toUpperCase() + t.slice(1) : t; };
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// Categorías de un toque: las de un kiosco típico, más las que el dueño ya usó.
+const CATS_BASE = ["Bebidas", "Golosinas", "Galletitas y snacks", "Cigarrillos", "Almacén", "Limpieza", "Higiene", "General"];
+const PAGINA = 40;
 
 export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   const [lista, setLista] = useState<Producto[]>([]);
@@ -18,50 +23,114 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   const [rafaga, setRafaga] = useState(true);
   const [aviso, setAviso] = useState("");
   const [buscando, setBuscando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  // catálogo
+  const [q, setQ] = useState("");
+  const [filtroCat, setFiltroCat] = useState("Todas");
+  const [soloSinStock, setSoloSinStock] = useState(false);
+  const [limite, setLimite] = useState(PAGINA);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [ed, setEd] = useState({ nombre: "", cat: "", precio: "" });
+  const refNombre = useRef<HTMLInputElement>(null);
+  const refPrecio = useRef<HTMLInputElement>(null);
 
   const cargar = useCallback(async () => {
-    const { data } = await supabase.from("productos").select("*").eq("kiosco_id", kiosco.id).order("categoria").order("nombre");
-    setLista((data ?? []) as Producto[]);
+    const { data, error } = await supabase.from("productos").select("*").eq("kiosco_id", kiosco.id).order("categoria").order("nombre").limit(2000);
+    if (error) setAviso("No pudimos cargar el catálogo. Revisá la conexión."); else setLista((data ?? []) as Producto[]);
   }, [kiosco.id]);
   useEffect(() => { cargar(); }, [cargar]);
 
-  const limpiar = () => { setBarcode(""); setNombre(""); setPrecio(""); setFuente("kiosco"); };
+  const categorias = useMemo(() => Array.from(new Set([...CATS_BASE, ...lista.map((p) => p.categoria)])), [lista]);
+  const catsUsadas = useMemo(() => Array.from(new Set(lista.map((p) => p.categoria))), [lista]);
+  const sinStock = useMemo(() => lista.filter((p) => !p.disponible).length, [lista]);
+  const visibles = useMemo(() => {
+    const nq = norm(q.trim());
+    return lista.filter((p) =>
+      (filtroCat === "Todas" || p.categoria === filtroCat) &&
+      (!soloSinStock || !p.disponible) &&
+      (!nq || norm(p.nombre).includes(nq) || (p.barcode ?? "").includes(nq)));
+  }, [lista, q, filtroCat, soloSinStock]);
+  useEffect(() => { setLimite(PAGINA); }, [q, filtroCat, soloSinStock]);
 
-  async function alLeerCodigo(raw: string) {
-    const code = raw.replace(/\D/g, "");
-    setEscaneando(false);
-    if (!code) return;
+  // La categoría se conserva entre productos: cargar 20 gaseosas seguidas no pide elegirla 20 veces.
+  const limpiar = () => { setBarcode(""); setNombre(""); setPrecio(""); setFuente("kiosco"); };
+  const enfocar = (r: React.RefObject<HTMLInputElement>) => setTimeout(() => r.current?.focus(), 60);
+
+  async function buscarCodigo(code: string) {
     setBarcode(code); setAviso(""); setBuscando(true);
     const propio = lista.find((p) => p.barcode === code);
     if (propio) {
       setBuscando(false);
       setAviso(`Ya lo tenés cargado: ${propio.nombre} (${peso(Number(propio.precio))}).`);
       limpiar();
+      if (rafaga) setEscaneando(true);
       return;
     }
     const hallado = await buscarPorBarcode(code);
     setBuscando(false);
-    if (hallado) { setNombre(hallado.nombre); setFuente(hallado.fuente); setAviso(hallado.fuente === "global" ? "Lo encontramos en la base de la red. Poné el precio." : "Lo encontramos. Revisá el nombre y poné el precio."); }
-    else { setNombre(""); setFuente("kiosco"); setAviso("No lo encontramos: escribí el nombre y el precio, queda guardado para la red."); }
+    if (hallado) {
+      setNombre(hallado.nombre); setFuente(hallado.fuente);
+      setAviso(hallado.fuente === "global" ? "Lo encontramos en la base de la red. Poné el precio." : "Lo encontramos. Revisá el nombre y poné el precio.");
+      enfocar(refPrecio);
+    } else {
+      setNombre(""); setFuente("kiosco");
+      setAviso("No lo encontramos: escribí el nombre y el precio, queda guardado para la red.");
+      enfocar(refNombre);
+    }
+  }
+
+  async function alLeerCodigo(raw: string) {
+    setEscaneando(false);
+    const code = raw.replace(/\D/g, "");
+    if (code) await buscarCodigo(code);
+  }
+
+  function alTipearCodigo(v: string) {
+    const code = v.replace(/\D/g, "");
+    setBarcode(code);
+    if ([8, 12, 13].includes(code.length) && esCodigoValido(code)) buscarCodigo(code);
   }
 
   async function guardar() {
+    if (guardando) return;
+    setGuardando(true);
+    const nombreOk = capitalizar(nombre);
     const { error } = await supabase.from("productos").insert({
-      kiosco_id: kiosco.id, barcode: barcode || null, nombre: nombre.trim(), precio: num(precio), categoria: cat.trim() || "General",
+      kiosco_id: kiosco.id, barcode: barcode || null, nombre: nombreOk, precio: num(precio), categoria: capitalizar(cat) || "General",
     });
+    setGuardando(false);
     if (error) { setAviso(error.code === "23505" ? "Ese código ya está en tu catálogo." : "No se pudo guardar, probá de nuevo."); return; }
-    if (barcode) await aportarAGlobal(barcode, nombre.trim(), fuente);
-    limpiar(); setAviso("Guardado ✔"); await cargar();
-    if (rafaga) setEscaneando(true);
+    if (barcode) await aportarAGlobal(barcode, nombreOk, fuente);
+    limpiar(); setAviso(`Guardado ✔ ${nombreOk}`); await cargar();
+    if (rafaga) setEscaneando(true); else enfocar(refNombre);
   }
 
-  async function toggle(p: Producto) { await supabase.from("productos").update({ disponible: !p.disponible }).eq("id", p.id); cargar(); }
+  async function toggle(p: Producto) {
+    const { error } = await supabase.from("productos").update({ disponible: !p.disponible }).eq("id", p.id);
+    if (error) setAviso("No se pudo cambiar el stock."); else cargar();
+  }
   async function cambiarPrecio(p: Producto) {
     const v = prompt(`Nuevo precio de ${p.nombre}`, String(p.precio));
-    if (v && !isNaN(num(v)) && num(v) >= 0) { await supabase.from("productos").update({ precio: num(v) }).eq("id", p.id); cargar(); }
+    if (v && !isNaN(num(v)) && num(v) >= 0) {
+      const { error } = await supabase.from("productos").update({ precio: num(v) }).eq("id", p.id);
+      if (error) setAviso("No se pudo cambiar el precio."); else cargar();
+    }
+  }
+  function abrirEdicion(p: Producto) { setEditId(editId === p.id ? null : p.id); setEd({ nombre: p.nombre, cat: p.categoria, precio: String(p.precio) }); }
+  async function guardarEdicion(p: Producto) {
+    const n = capitalizar(ed.nombre); const pr = num(ed.precio);
+    if (n.length < 2 || isNaN(pr) || pr < 0) { setAviso("Revisá el nombre y el precio."); return; }
+    const { error } = await supabase.from("productos").update({ nombre: n, categoria: capitalizar(ed.cat) || "General", precio: pr }).eq("id", p.id);
+    if (error) { setAviso("No se pudo guardar el cambio."); return; }
+    setEditId(null); setAviso(`Actualizado ✔ ${n}`); cargar();
+  }
+  async function eliminar(p: Producto) {
+    if (!confirm(`¿Eliminar "${p.nombre}" del catálogo?`)) return;
+    const { error } = await supabase.from("productos").delete().eq("id", p.id);
+    if (error) setAviso("No se pudo eliminar."); else { setEditId(null); setAviso("Eliminado ✔"); cargar(); }
   }
 
-  const puede = nombre.trim().length >= 2 && precio !== "" && num(precio) >= 0 && !buscando;
+  const puede = nombre.trim().length >= 2 && precio !== "" && !isNaN(num(precio)) && num(precio) >= 0 && !buscando && !guardando;
   return (
     <>
       <h2>Cargar producto</h2>
@@ -74,22 +143,55 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
       </label>
       {aviso && <p role="status" className="mut">{aviso}</p>}
       {buscando && <p className="mut">Buscando…</p>}
-      <input placeholder="Código de barras (opcional)" value={barcode} onChange={(e) => setBarcode(e.target.value.replace(/\D/g, ""))} inputMode="numeric" />
-      <input placeholder="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-      <input placeholder="Precio" value={precio} onChange={(e) => setPrecio(e.target.value)} inputMode="decimal" />
-      <input placeholder="Categoría" value={cat} onChange={(e) => setCat(e.target.value)} />
-      <button disabled={!puede} onClick={guardar}>Guardar</button>
+      <input placeholder="Código de barras (opcional)" value={barcode} onChange={(e) => alTipearCodigo(e.target.value)} inputMode="numeric" />
+      <input ref={refNombre} placeholder="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} enterKeyHint="next"
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); refPrecio.current?.focus(); } }} />
+      <input ref={refPrecio} placeholder="Precio" value={precio} onChange={(e) => setPrecio(e.target.value)} inputMode="decimal" enterKeyHint="done"
+        onKeyDown={(e) => { if (e.key === "Enter" && puede) { e.preventDefault(); guardar(); } }} />
+      <div className="chips" role="group" aria-label="Categoría">
+        {categorias.map((c) => (<button key={c} type="button" className={c === cat ? "" : "sec"} onClick={() => setCat(c)}>{c}</button>))}
+      </div>
+      <input placeholder="Otra categoría" value={cat} onChange={(e) => setCat(e.target.value)} />
+      <button disabled={!puede} onClick={guardar}>{guardando ? "Guardando…" : "Guardar"}</button>
 
-      <h2>Catálogo ({lista.length})</h2>
-      {lista.map((p) => (
-        <div className="card row" key={p.id}>
-          <div><div>{p.nombre}</div><span className="mut">{p.categoria}</span></div>
-          <div className="qty">
-            <button className="sec" onClick={() => cambiarPrecio(p)}>{peso(Number(p.precio))}</button>
-            <button className={p.disponible ? "" : "sec"} onClick={() => toggle(p)}>{p.disponible ? "Hay" : "Sin stock"}</button>
+      <h2>Catálogo ({lista.length}{sinStock > 0 ? ` · ${sinStock} sin stock` : ""})</h2>
+      <input type="search" placeholder="Buscar por nombre o código" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="chips" role="group" aria-label="Filtrar por categoría">
+        {["Todas", ...catsUsadas].map((c) => (<button key={c} type="button" className={c === filtroCat ? "" : "sec"} onClick={() => setFiltroCat(c)}>{c}</button>))}
+      </div>
+      {sinStock > 0 && (
+        <label className="mut" style={{ display: "block", margin: "6px 0" }}>
+          <input type="checkbox" checked={soloSinStock} onChange={(e) => setSoloSinStock(e.target.checked)} style={{ width: "auto", marginRight: 8 }} />Mostrar solo sin stock
+        </label>
+      )}
+      {lista.length > 0 && visibles.length === 0 && <p className="mut">Nada coincide con ese filtro.</p>}
+      {visibles.slice(0, limite).map((p) => (
+        <div className="card" key={p.id} style={p.disponible ? undefined : { opacity: 0.7 }}>
+          <div className="row">
+            <div onClick={() => abrirEdicion(p)} style={{ cursor: "pointer", minWidth: 0 }}>
+              <div>{p.nombre} <span className="mut">✎</span></div><span className="mut">{p.categoria}</span>
+            </div>
+            <div className="qty">
+              <button className="sec" onClick={() => cambiarPrecio(p)}>{peso(Number(p.precio))}</button>
+              <button className={p.disponible ? "" : "sec"} onClick={() => toggle(p)}>{p.disponible ? "Hay" : "Sin stock"}</button>
+            </div>
           </div>
+          {editId === p.id && (
+            <div style={{ marginTop: 10 }}>
+              <input value={ed.nombre} onChange={(e) => setEd({ ...ed, nombre: e.target.value })} placeholder="Nombre" />
+              <input value={ed.cat} onChange={(e) => setEd({ ...ed, cat: e.target.value })} placeholder="Categoría" list="cats-edit" />
+              <datalist id="cats-edit">{categorias.map((c) => <option key={c} value={c} />)}</datalist>
+              <input value={ed.precio} onChange={(e) => setEd({ ...ed, precio: e.target.value })} placeholder="Precio" inputMode="decimal" />
+              <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
+                <button onClick={() => guardarEdicion(p)}>Guardar cambios</button>
+                <button className="sec" onClick={() => setEditId(null)}>Cancelar</button>
+                <button className="sec" onClick={() => eliminar(p)} style={{ color: "#c0392b" }}>Eliminar</button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
+      {visibles.length > limite && <button className="sec" onClick={() => setLimite(limite + PAGINA)}>Ver más ({visibles.length - limite})</button>}
     </>
   );
 }

@@ -12,6 +12,8 @@ export function normalizarTelefonoAR(input: string): string {
   return "549" + d;
 }
 
+export const ETIQUETA_PAGO: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", mercadopago: "Mercado Pago" };
+
 export const peso = (n: number) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
 
@@ -21,13 +23,15 @@ export function linkWhatsApp(telefonoIntl: string, texto: string) {
 
 export function mensajePedido(p: {
   numero?: number; nombre: string; telefono: string; modalidad: "retiro" | "envio";
-  direccion?: string; items: { nombre: string; cantidad: number; precio: number }[]; total: number; notas?: string;
+  direccion?: string; costoEnvio?: number; medioPago?: string; items: { nombre: string; cantidad: number; precio: number }[]; total: number; notas?: string;
 }) {
   const lineas = p.items.map((i) => `• ${i.cantidad} x ${i.nombre} — ${peso(i.precio * i.cantidad)}`);
   return [
     `Hola! Quiero hacer un pedido${p.numero ? ` (#${p.numero})` : ""}:`,
     ...lineas,
+    p.costoEnvio ? `Envío: ${peso(p.costoEnvio)}` : "",
     `Total: ${peso(p.total)}`,
+    p.medioPago ? `Pago: ${ETIQUETA_PAGO[p.medioPago] ?? p.medioPago}` : "",
     p.modalidad === "envio" ? `Envío a: ${p.direccion}` : "Retiro en el local",
     p.notas ? `Nota: ${p.notas}` : "",
     `Nombre: ${p.nombre}`,
