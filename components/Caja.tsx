@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
-import { fecha, mensajeError, normalizarResumen, num, type Cliente, type ProductoPos, type Resumen, type Turno } from "@/lib/caja";
+import { CONFIG_POR_DEFECTO, fecha, mensajeError, normalizarResumen, num, type Cliente, type PosConfig, type ProductoPos, type Resumen, type Turno } from "@/lib/caja";
+import type { Promo } from "@/lib/pos/promos";
 import { peso } from "@/lib/whatsapp";
 import PosVenta, { type Destino } from "./caja/PosVenta";
 import VentasTurno from "./caja/VentasTurno";
@@ -9,9 +10,13 @@ import Movimientos from "./caja/Movimientos";
 import CierreCaja from "./caja/CierreCaja";
 import Historial from "./caja/Historial";
 import Favoritos from "./caja/Favoritos";
+import BuscarVentas from "./caja/BuscarVentas";
+import Promos from "./caja/Promos";
+import ConfigPos from "./caja/ConfigPos";
+import { reconectarImpresora } from "@/lib/pos/impresora";
 
-type Seccion = "venta" | "ventas" | "movimientos" | "cierre" | "favoritos" | "historial";
-const SECCIONES: [Seccion, string][] = [["venta", "Venta"], ["ventas", "Ventas del turno"], ["movimientos", "Movimientos"], ["cierre", "Cierre y Reporte Z"], ["favoritos", "Favoritos"], ["historial", "Historial"]];
+type Seccion = "venta" | "ventas" | "buscar" | "movimientos" | "cierre" | "favoritos" | "promos" | "historial" | "config";
+const SECCIONES: [Seccion, string][] = [["venta", "Venta"], ["ventas", "Ventas del turno"], ["buscar", "Buscar ventas"], ["movimientos", "Movimientos"], ["cierre", "Cierre y Reporte Z"], ["favoritos", "Favoritos"], ["promos", "Promos"], ["historial", "Historial"], ["config", "Configuración"]];
 
 const aTurno = (t: Turno): Turno => ({
   ...t, monto_inicial: Number(t.monto_inicial),
@@ -27,6 +32,8 @@ export default function Caja({ kiosco }: { kiosco: Kiosco }) {
   const [productos, setProductos] = useState<ProductoPos[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [promos, setPromos] = useState<Promo[]>([]);
+  const [config, setConfig] = useState<PosConfig>(CONFIG_POR_DEFECTO);
   const [seccion, setSeccion] = useState<Seccion>("venta");
   const [fondo, setFondo] = useState("");
   const [msg, setMsg] = useState("");
@@ -45,12 +52,16 @@ export default function Caja({ kiosco }: { kiosco: Kiosco }) {
   }, [kiosco.id]);
 
   const cargarCatalogo = useCallback(async () => {
-    const [p, c, f] = await Promise.all([
-      supabase.from("productos").select("id,nombre,categoria,precio,barcode,stock,stock_controlado,disponible").eq("kiosco_id", kiosco.id).order("nombre"),
+    const [p, c, f, pm, cf] = await Promise.all([
+      supabase.from("productos").select("id,nombre,categoria,precio,barcode,stock,stock_controlado,disponible,vendido_por_peso,plu,permite_sin_stock").eq("kiosco_id", kiosco.id).order("nombre"),
       supabase.from("clientes_saldo").select("id,nombre,telefono,saldo").eq("kiosco_id", kiosco.id).order("nombre"),
       supabase.from("pos_favoritos").select("producto_id,orden").eq("kiosco_id", kiosco.id).order("orden"),
+      supabase.from("pos_promos").select("id,nombre,tipo,producto_id,categoria,lleva,paga,pct,desde,hasta,activa").eq("kiosco_id", kiosco.id).eq("activa", true),
+      supabase.from("pos_config").select("sonido,imprimir_auto,abrir_cajon,ticket_encabezado,ticket_pie,ticket_ancho,tiene_pin,pin_anular,pin_devolucion").eq("kiosco_id", kiosco.id).maybeSingle(),
     ]);
-    if (p.data) setProductos(p.data.map((x) => ({ ...x, precio: Number(x.precio), stock: Number(x.stock ?? 0), stock_controlado: !!x.stock_controlado })) as ProductoPos[]);
+    if (pm.data) setPromos(pm.data.map((x) => ({ ...x, pct: x.pct == null ? null : Number(x.pct) })) as Promo[]);
+    if (cf.data) setConfig({ ...CONFIG_POR_DEFECTO, ...(cf.data as Partial<PosConfig>) });
+    if (p.data) setProductos(p.data.map((x) => ({ ...x, precio: Number(x.precio), stock: Number(x.stock ?? 0), stock_controlado: !!x.stock_controlado, vendido_por_peso: !!x.vendido_por_peso, permite_sin_stock: !!x.permite_sin_stock, plu: x.plu ?? null })) as ProductoPos[]);
     if (c.data) setClientes(c.data.map((x) => ({ ...x, saldo: Number(x.saldo) })) as Cliente[]);
     if (f.data) setFavoritos(f.data.map((x) => x.producto_id as string));
   }, [kiosco.id]);
@@ -64,6 +75,7 @@ export default function Caja({ kiosco }: { kiosco: Kiosco }) {
 
   useEffect(() => { void cargarTurnos(); void cargarCatalogo(); }, [cargarTurnos, cargarCatalogo]);
   useEffect(() => { void cargarResumen(); }, [cargarResumen]);
+  useEffect(() => { void reconectarImpresora(); }, []);
 
   const alCambio = useCallback(async () => { await Promise.all([cargarResumen(), cargarCatalogo()]); }, [cargarResumen, cargarCatalogo]);
   const irA = useCallback((d: Destino) => setSeccion(d === "z" ? "cierre" : d), []);
@@ -124,14 +136,17 @@ export default function Caja({ kiosco }: { kiosco: Kiosco }) {
       {/* El POS queda montado (oculto) para no perder el carrito al cambiar de sección. */}
       <div hidden={seccion !== "venta"}>
         {aviso && <p className="pos-aviso" role="status">{aviso}</p>}
-        <PosVenta kiosco={kiosco} turno={turno} productos={productos} favoritos={favoritos} clientes={clientes}
+        <PosVenta kiosco={kiosco} turno={turno} productos={productos} favoritos={favoritos} clientes={clientes} promos={promos} config={config}
           activo={seccion === "venta"} onVendida={alCambio} onIr={irA} />
       </div>
-      {seccion === "ventas" && resumen && <VentasTurno kiosco={kiosco} resumen={resumen} abierto onCambio={alCambio} />}
+      {seccion === "ventas" && resumen && <VentasTurno kiosco={kiosco} resumen={resumen} abierto config={config} onCambio={alCambio} />}
+      {seccion === "buscar" && <BuscarVentas kiosco={kiosco} config={config} turnoAbierto onCambio={alCambio} />}
       {seccion === "movimientos" && resumen && <Movimientos resumen={resumen} turnoId={turno.id} abierto onCambio={alCambio} />}
       {seccion === "cierre" && <CierreCaja kiosco={kiosco} turnoId={turno.id} refresco={refresco} onCerrada={alCerrar} />}
       {seccion === "favoritos" && <Favoritos kiosco={kiosco} productos={productos} favoritos={favoritos} onCambio={cargarCatalogo} />}
+      {seccion === "promos" && <Promos kiosco={kiosco} productos={productos} promos={promos} onCambio={cargarCatalogo} />}
       {seccion === "historial" && <Historial kiosco={kiosco} turnos={turnos} />}
+      {seccion === "config" && <ConfigPos kiosco={kiosco} config={config} onCambio={cargarCatalogo} />}
     </div>
   );
 }

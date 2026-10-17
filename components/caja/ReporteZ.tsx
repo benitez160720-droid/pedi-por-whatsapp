@@ -7,7 +7,7 @@ export default function ReporteZView({ z, kioscoNombre }: { z: ReporteZ; kioscoN
   const filaDif = z.diferencia;
   return (
     <div>
-      <div className="ticket-print" id="ticket-imprimible">
+      <div className="ticket-print" id="ticket-imprimible" data-ancho="80">
         <div className="ticket-cab">
           <b>{kioscoNombre}</b>
           <span>REPORTE Z · {z.estado === "cerrado" ? "Caja cerrada" : "Caja abierta (parcial)"}</span>
@@ -29,7 +29,12 @@ export default function ReporteZView({ z, kioscoNombre }: { z: ReporteZ; kioscoN
           <div className="ticket-linea"><span>Ventas</span><span>{z.ventas}</span></div>
           <div className="ticket-linea"><span>Anuladas</span><span>{z.anuladas}</span></div>
           <div className="ticket-linea"><span>Descuentos</span><span>{peso(z.descuentos)}</span></div>
+          {(z.descuentos_lineas ?? 0) > 0 && <div className="ticket-linea"><span>· por renglón</span><span>{peso(z.descuentos_lineas ?? 0)}</span></div>}
+          {(z.descuentos_promos ?? 0) > 0 && <div className="ticket-linea"><span>· por promociones</span><span>{peso(z.descuentos_promos ?? 0)}</span></div>}
+          {(z.descuentos - (z.descuentos_lineas ?? 0) - (z.descuentos_promos ?? 0)) > 0.004 && <div className="ticket-linea"><span>· global</span><span>{peso(z.descuentos - (z.descuentos_lineas ?? 0) - (z.descuentos_promos ?? 0))}</span></div>}
           <div className="ticket-linea ticket-total"><span>TOTAL VENDIDO</span><span>{peso(z.total_vendido)}</span></div>
+          {(z.devoluciones ?? 0) > 0 && <div className="ticket-linea"><span>Devoluciones ({z.devoluciones})</span><span>−{peso(z.devoluciones_total ?? 0)}</span></div>}
+          {(z.devoluciones ?? 0) > 0 && <div className="ticket-linea ticket-total"><span>TOTAL NETO</span><span>{peso(z.total_neto ?? z.total_vendido)}</span></div>}
         </div>
         <p className="ticket-gracias">La cuenta corriente no entra en la caja: queda anotada en Fiado.</p>
       </div>

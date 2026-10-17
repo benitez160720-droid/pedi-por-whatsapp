@@ -14,8 +14,11 @@ export function normalizarTelefonoAR(input: string): string {
 
 export const ETIQUETA_PAGO: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", mercadopago: "Mercado Pago" };
 
-export const peso = (n: number) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+// Enteros sin decimales ($ 1.500); si hay centavos se muestran ($ 332,67): una venta por peso o una devolución prorrateada no puede verse redondeada.
+export const peso = (n: number) => {
+  const dec = Number.isInteger(n) ? 0 : 2;
+  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n);
+};
 
 export function linkWhatsApp(telefonoIntl: string, texto: string) {
   return `https://wa.me/${telefonoIntl}?text=${encodeURIComponent(texto)}`;

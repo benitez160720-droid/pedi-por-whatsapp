@@ -10,8 +10,9 @@
     "test:importar": "node tests/importar.test.mjs",
     "test:horario": "node tests/horario.test.mjs",
     "test:fotos": "node tests/fotos.test.mjs",
-    "test": "npm run test:importar && npm run test:horario && npm run test:fotos && npm run test:push",
-    "test:push": "node tests/push.test.mjs"
+    "test": "npm run test:importar && npm run test:horario && npm run test:fotos && npm run test:push && npm run test:pos",
+    "test:push": "node tests/push.test.mjs",
+    "test:pos": "node tests/pos.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

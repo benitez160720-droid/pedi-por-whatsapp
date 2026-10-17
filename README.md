@@ -62,3 +62,11 @@ Pasos para activarlo (una sola vez):
 4. Redeploy. En el panel, tocar **Activar avisos** (en iPhone, primero agregar la app a la pantalla de inicio: Safari no envía push fuera de una app instalada).
 
 Límites: el aviso llega si el navegador o la app instalada siguen con permiso; si el navegador revoca la suscripción, se borra sola. Probado en `npm test` solo la lógica del mensaje; el envío real (celular, service worker y webhook) hay que probarlo en el preview.
+
+## POS avanzado (0013, 0014)
+- `0013_pos_avanzado.sql`: venta por peso (gramos / precio por kg), PLU, descuento por renglón, promociones (NxM, % por producto o categoría), venta sin stock por producto, ventas offline idempotentes, devoluciones parciales con reembolso por medio de pago, PIN de supervisor con bloqueo por intentos y token de un solo uso. Test: `supabase/tests/etapa11_test.py`.
+- `0014_pin_opciones.sql` (**aplicar DESPUÉS de 0013**): las opciones "pedir PIN al anular / devolver" se cambian solo con `pos_pin_opciones`; aflojarlas con PIN configurado exige token vigente. Test: `supabase/tests/etapa12_test.py`.
+- Pantallas nuevas en Caja: Promos, Buscar ventas, Devolver, Configuración del POS (ticket, cajón, sonido, PIN, impresora térmica).
+- Impresora térmica directa ESC/POS (58/80 mm) por WebUSB o puerto serie (`lib/pos/escpos.ts`, `lib/pos/impresora.ts`).
+- Celular como lector de códigos: botón "Vincular celular" en la caja (QR) y página `/escanear`; los códigos viajan por un canal Realtime (broadcast) con token que vence a los 45 min (`lib/pos/remoto.ts`, `components/caja/useVinculoCelular.ts`).
+- Tests de base contra un Postgres propio: `PG_HOST=/tmp PG_PORT=5433 python3 supabase/tests/etapa11_test.py` (también `etapa10`, `etapa12`). Tests de la app: `npm test`.
