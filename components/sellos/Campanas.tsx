@@ -31,7 +31,7 @@ export default function Campanas({ kiosco, campanas, productos, onCambio }: { ki
       : await supabase.from("fidelidad_campanas").insert({ ...fila, kiosco_id: kiosco.id });
     setOcupado(false);
     if (error) return setMsg(mensajeFidelidad(error.message));
-    setForm(null); setMsg("Forma de sumar puntos guardada ✔"); onCambio();
+    setForm(null); setMsg("Forma de sumar puntos guardada"); onCambio();
   }
   async function activar(c: Campana) {
     const { error } = await supabase.from("fidelidad_campanas").update({ activa: !c.activa }).eq("id", c.id).eq("kiosco_id", kiosco.id);
