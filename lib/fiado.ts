@@ -7,3 +7,12 @@ export function armarAvisoFiado(a: { clientes: number; monto: number; dias: numb
     url: "/panel?tab=fiado",
   };
 }
+
+// Aviso semanal de clientes que dejaron de venir (lo manda el cron, solo al dueño). Va a Radar.
+export function armarAvisoFuga(a: { clientes: number; dias: number }) {
+  return {
+    title: "Clientes que dejaron de venir",
+    body: `${a.clientes} cliente${a.clientes > 1 ? "s" : ""} no compra${a.clientes > 1 ? "n" : ""} hace más de ${a.dias} días`,
+    url: "/panel?tab=radar",
+  };
+}
