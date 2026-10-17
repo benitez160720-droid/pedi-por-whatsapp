@@ -34,8 +34,9 @@ jobs:
           test -n "$RUN_ID" || { echo "No hay backups exitosos para restaurar"; exit 1; }
           echo "Backup del run $RUN_ID"
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --dir backup-src
-          test -f backup-src/backup.dump || { echo "El artefacto no contiene backup.dump"; find backup-src; exit 1; }
-          mv backup-src/backup.dump ./backup.dump
+          F=$(find backup-src -name backup.dump | head -1)
+          test -n "$F" || { echo "El artefacto no contiene backup.dump"; find backup-src; exit 1; }
+          mv "$F" ./backup.dump
           ls -lh backup.dump
       - name: Restaurar en el proyecto de prueba
         env:
