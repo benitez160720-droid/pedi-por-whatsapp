@@ -70,3 +70,8 @@ Límites: el aviso llega si el navegador o la app instalada siguen con permiso; 
 - Impresora térmica directa ESC/POS (58/80 mm) por WebUSB o puerto serie (`lib/pos/escpos.ts`, `lib/pos/impresora.ts`).
 - Celular como lector de códigos: botón "Vincular celular" en la caja (QR) y página `/escanear`; los códigos viajan por un canal Realtime (broadcast) con token que vence a los 45 min (`lib/pos/remoto.ts`, `components/caja/useVinculoCelular.ts`).
 - Tests de base contra un Postgres propio: `PG_HOST=/tmp PG_PORT=5433 python3 supabase/tests/etapa11_test.py` (también `etapa10`, `etapa12`). Tests de la app: `npm test`.
+
+## Proveedores, compras y stock (0015)
+- `0015_proveedores_compras.sql` (**aplicar DESPUÉS de 0014**): proveedores con cuenta corriente (compras suman deuda, pagos la restan), compras con ingreso de mercadería que suma stock y guarda el último costo (`productos.costo`, no visible en la tienda pública), pago al instante o a cuenta, anulación de compra (no se deja si ya se vendió parte de esa mercadería), ajuste manual de stock con motivo y historial de movimientos. Todo se escribe por funciones; el cliente solo lee. Test: `supabase/tests/etapa13_test.py` (41 chequeos, sobre 0001–0015).
+- Panel: pestaña **Proveedores** (Catálogo → Proveedores). Los productos por peso se cargan en kg y se guardan en gramos.
+- Límites conocidos: los pagos a proveedores no mueven la caja del turno (no entran en el arqueo); el historial de stock registra compras, anulaciones y ajustes, no las ventas.

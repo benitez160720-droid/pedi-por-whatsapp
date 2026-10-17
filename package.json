@@ -10,14 +10,17 @@
     "test:importar": "node tests/importar.test.mjs",
     "test:horario": "node tests/horario.test.mjs",
     "test:fotos": "node tests/fotos.test.mjs",
-    "test": "npm run test:importar && npm run test:horario && npm run test:fotos && npm run test:push && npm run test:pos",
+    "test": "npm run test:importar && npm run test:horario && npm run test:fotos && npm run test:push && npm run test:pos && npm run test:compras && npm run test:etiquetas",
     "test:push": "node tests/push.test.mjs",
-    "test:pos": "node tests/pos.test.mjs"
+    "test:pos": "node tests/pos.test.mjs",
+    "test:compras": "node tests/compras.test.mjs",
+    "test:etiquetas": "node tests/etiquetas.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
+    "jsbarcode": "^3.12.3",
     "next": "^14.2.15",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",

@@ -10,6 +10,9 @@ import Pedidos from "@/components/Pedidos";
 import Fiado from "@/components/Fiado";
 import Sellos from "@/components/Sellos";
 import Precios from "@/components/Precios";
+import Proveedores from "@/components/Proveedores";
+import Etiquetas from "@/components/Etiquetas";
+import type { Seleccion } from "@/lib/etiquetas";
 import Avisos from "@/components/Avisos";
 import Caja from "@/components/Caja";
 import Resumen from "@/components/Resumen";
@@ -69,7 +72,7 @@ function CrearKiosco({ userId, onListo }: { userId: string; onListo: () => void 
   );
 }
 
-type Tab = "pedidos" | "productos" | "fiado" | "caja" | "sellos" | "precios" | "resumen" | "local";
+type Tab = "pedidos" | "productos" | "fiado" | "caja" | "sellos" | "precios" | "proveedores" | "etiquetas" | "resumen" | "local";
 type Grupo = { titulo: string; items: [Tab, string, string][] };
 // Ícono (trazo) por sección, para el menú lateral.
 const ICONOS: Record<Tab, string> = {
@@ -77,6 +80,8 @@ const ICONOS: Record<Tab, string> = {
   caja: "M3 7h18v12H3zM3 7l3-4h12l3 4M8 13h.01M12 13h4",
   fiado: "M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3zM8 9h8M8 13h5",
   productos: "M21 16V8l-9-5-9 5v8l9 5zM3.3 7.5 12 12.5l8.7-5M12 22V12.5",
+  proveedores: "M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10",
+  etiquetas: "M3 6h2v12H3zM7 6h1v12H7zM10 6h3v12h-3zM15 6h1v12h-1zM18 6h3v12h-3z",
   precios: "M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2.8 12.8A2 2 0 0 1 2.2 11.4l.5-7.7a1 1 0 0 1 1-1l7.7-.5a2 2 0 0 1 1.4.6l7.8 7.8a2 2 0 0 1 0 2.8zM7.5 7.5h.01",
   sellos: "M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z",
   resumen: "M4 20V10M10 20V4M16 20v-8M22 20H2",
@@ -84,12 +89,13 @@ const ICONOS: Record<Tab, string> = {
 };
 const GRUPOS: Grupo[] = [
   { titulo: "Vender", items: [["caja", "Caja", "Punto de venta"], ["pedidos", "Pedidos", "WhatsApp y tienda"], ["fiado", "Fiado", "Cuentas corrientes"]] },
-  { titulo: "Catálogo", items: [["productos", "Productos", "Stock y fotos"], ["precios", "Precios", "Ajustes masivos"]] },
+  { titulo: "Catálogo", items: [["productos", "Productos", "Stock y fotos"], ["precios", "Precios", "Ajustes masivos"], ["proveedores", "Proveedores", "Compras y stock"], ["etiquetas", "Etiquetas", "Precios con código"]] },
   { titulo: "Negocio", items: [["resumen", "Resumen", "Ventas y balance"], ["sellos", "Sellos", "Fidelización"], ["local", "Mi local", "Datos y horarios"]] },
 ];
 
 function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
   const [tab, setTab] = useState<Tab>("pedidos");
+  const [precarga, setPrecarga] = useState<Seleccion[] | null>(null);
   const [ahora, setAhora] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setAhora(new Date()), 30000); return () => clearInterval(t); }, []);
   const estado = estadoTienda(kiosco, ahora);
@@ -137,6 +143,8 @@ function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
         {tab === "caja" && <Caja kiosco={kiosco} />}
         {tab === "sellos" && <Sellos kiosco={kiosco} />}
         {tab === "precios" && <Precios kiosco={kiosco} />}
+        {tab === "proveedores" && <Proveedores kiosco={kiosco} onEtiquetas={(sel) => { setPrecarga(sel); setTab("etiquetas"); }} />}
+        {tab === "etiquetas" && <Etiquetas kiosco={kiosco} precarga={precarga} onPrecargaUsada={() => setPrecarga(null)} />}
         {tab === "resumen" && <Resumen kiosco={kiosco} onIr={setTab} />}
         {tab === "local" && <MiKiosco kiosco={kiosco} onGuardado={recargar} />}
       </section>
