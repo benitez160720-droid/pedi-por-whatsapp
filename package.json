@@ -10,7 +10,7 @@
     "test:importar": "node tests/importar.test.mjs",
     "test:horario": "node tests/horario.test.mjs",
     "test:fotos": "node tests/fotos.test.mjs",
-    "test": "npm run test:importar && npm run test:horario && npm run test:fotos && npm run test:push && npm run test:pos && npm run test:compras && npm run test:etiquetas && npm run test:fidelidad && npm run test:reposicion && npm run test:margen && npm run test:fiado && npm run test:errores",
+    "test": "npm run test:importar && npm run test:horario && npm run test:fotos && npm run test:push && npm run test:pos && npm run test:compras && npm run test:etiquetas && npm run test:fidelidad && npm run test:reposicion && npm run test:margen && npm run test:fiado && npm run test:fuga && npm run test:modificados && npm run test:errores",
     "test:push": "node tests/push.test.mjs",
     "test:pos": "node tests/pos.test.mjs",
     "test:compras": "node tests/compras.test.mjs",
@@ -19,6 +19,8 @@
     "test:reposicion": "node tests/reposicion.test.mjs",
     "test:margen": "node tests/margen.test.mjs",
     "test:fiado": "node tests/fiado.test.mjs",
+    "test:fuga": "node tests/fuga.test.mjs",
+    "test:modificados": "node tests/modificados.test.mjs",
     "check:migraciones": "node scripts/check-migraciones.mjs",
     "test:errores": "node tests/errores.test.mjs"
   },

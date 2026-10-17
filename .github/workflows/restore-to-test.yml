@@ -1,7 +1,12 @@
 name: Restore a proyecto de prueba
 # Prueba que el último backup se pueda restaurar. Solo manual (workflow_dispatch).
 # Requiere SUPABASE_TEST_DB_URL: Session pooler de un proyecto de PRUEBA, nunca el de producción.
-# La restauración usa --clean: borra y recrea el esquema public del destino de prueba.
+# Antes de restaurar se borra el esquema public del destino de prueba (el dump trae su propio CREATE SCHEMA public).
+# Se omiten TRIGGERS y CLAVES FORÁNEAS a propósito:
+#  - Los triggers (p. ej. el webhook de pedidos) llamarían a la URL de producción con cada insert de prueba,
+#    y el proyecto de prueba no tiene el esquema supabase_functions.
+#  - Las claves foráneas a auth.users fallan porque el dump solo trae public y auth está vacío en la prueba.
+# Por eso la prueba valida tablas y datos (comparación de tablas y conteos), NO triggers ni claves foráneas.
 on:
   workflow_dispatch:
 permissions:
@@ -43,7 +48,12 @@ jobs:
         run: |
           set -e
           export PATH="/usr/lib/postgresql/17/bin:$PATH"
-          pg_restore --no-owner --no-privileges --clean --if-exists --exit-on-error --dbname "$TEST_URL" backup.dump
+          OMITIR='^[0-9]+; [0-9]+ [0-9]+ (TRIGGER|EVENT TRIGGER|FK CONSTRAINT) '
+          pg_restore -l backup.dump > dump.list
+          echo "Entradas del dump: $(wc -l < dump.list). Omitidas (triggers y claves foráneas): $(grep -c -E "$OMITIR" dump.list || true)"
+          grep -v -E "$OMITIR" dump.list > restore.list
+          psql "$TEST_URL" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade"
+          pg_restore --no-owner --no-privileges --exit-on-error -L restore.list --dbname "$TEST_URL" backup.dump
           echo "Restauración terminada."
       - name: Comparar tablas y conteos con producción
         env:

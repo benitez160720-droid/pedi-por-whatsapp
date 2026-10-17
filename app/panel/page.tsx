@@ -103,8 +103,8 @@ const GRUPOS: Grupo[] = [
 
 function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
   const [tab, setTab] = useState<Tab>("pedidos");
-  // Los avisos push abren /panel?tab=reponer (se lee al montar para no romper el render del servidor).
-  useEffect(() => { if (new URLSearchParams(location.search).get("tab") === "reponer") setTab("reponer"); }, []);
+  // Los avisos push abren /panel?tab=reponer, ?tab=fiado o ?tab=radar (se lee al montar para no romper el render del servidor).
+  useEffect(() => { const t = new URLSearchParams(location.search).get("tab"); if (t === "reponer" || t === "fiado" || t === "radar") setTab(t); }, []);
   const [precarga, setPrecarga] = useState<Seleccion[] | null>(null);
   const [precargaCompra, setPrecargaCompra] = useState<{ proveedorId: string; lineas: LineaCompra[] } | null>(null);
   const [ahora, setAhora] = useState(() => new Date());

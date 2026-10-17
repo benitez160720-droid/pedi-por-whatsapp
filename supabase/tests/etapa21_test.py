@@ -1,4 +1,4 @@
-# Verifica 0024 y 0025 (clientes en fuga, avisos "avisame cuando" y lotes FEFO). Uso: python3 supabase/tests/etapa21_test.py
+# Verifica 0024, 0025 y 0026 (clientes en fuga, avisos "avisame cuando", lotes FEFO y aviso semanal de fuga). Uso: python3 supabase/tests/etapa21_test.py
 # Con PG_HOST/PG_PORT: servidor propio (crea una base nueva por corrida). Sin eso: Postgres embebido con pgserver.
 import os, psycopg2, uuid, tempfile, sys, json
 from datetime import timedelta
@@ -30,7 +30,7 @@ grant usage on schema storage to anon, authenticated;
 grant all on storage.objects to anon, authenticated;
 create publication supabase_realtime;
 """)
-for m in ["0001_init", "0002_fiado_sellos_precios", "0003_endurecer_permisos", "0004_operacion_kiosco", "0005_pedido_a_fiado", "0006_cierre_etapa3", "0007_borrar_cliente", "0008_push", "0009_stock", "0010_caja", "0011_mostrador", "0012_pos", "0013_pos_avanzado", "0014_pin_opciones", "0015_proveedores_compras", "0016_etiquetas", "0017_fidelidad", "0018_reposicion", "0019_motivos_mermas", "0020_historial_stock", "0021_conteo_planilla", "0022_margen_precios", "0023_fase3_abc_fiado", "0024_endurecer_funciones", "0025_fuga_reglas_lotes"]:
+for m in ["0001_init", "0002_fiado_sellos_precios", "0003_endurecer_permisos", "0004_operacion_kiosco", "0005_pedido_a_fiado", "0006_cierre_etapa3", "0007_borrar_cliente", "0008_push", "0009_stock", "0010_caja", "0011_mostrador", "0012_pos", "0013_pos_avanzado", "0014_pin_opciones", "0015_proveedores_compras", "0016_etiquetas", "0017_fidelidad", "0018_reposicion", "0019_motivos_mermas", "0020_historial_stock", "0021_conteo_planilla", "0022_margen_precios", "0023_fase3_abc_fiado", "0024_endurecer_funciones", "0025_fuga_reglas_lotes", "0026_fuga_semanal"]:
     cur.execute(open(f"supabase/migrations/{m}.sql").read())
 A, B = str(uuid.uuid4()), str(uuid.uuid4())
 cur.execute("insert into auth.users values (%s),(%s)", (A, B))
@@ -88,6 +88,18 @@ ok(has(fails("select * from clientes_en_fuga(%s)", (ka,)), "no_autorizado"), "ot
 ok(has(fails("select * from clientes_en_fuga(%s, 2)", (kb,)), "dias_invalidos"), "días fuera de rango se rechazan")
 as_("authenticated", A)
 ok(has(fails("select * from clientes_en_fuga(%s, 45, 0)", (ka,)), "minimo_compras_invalido"), "mínimo de compras inválido se rechaza")
+
+# ---- 1b) Aviso semanal de fuga (0026): solo el cron, una vez por kiosco y semana
+as_("authenticated", A)
+ok(has(fails("select * from fuga_conteo_semanal()"), "permission denied"), "el dueño no puede ejecutar el conteo semanal (solo el cron)")
+ok(has(fails("select * from fuga_avisos_semanales()"), "permission denied"), "el dueño no puede ejecutar los avisos semanales (solo el cron)")
+cur.execute("reset role")
+cont = {str(r["kiosco"]): r["clientes"] for r in rows("select * from fuga_conteo_semanal()")}
+ok(cont.get(str(ka)) == 1 and str(kb) not in cont, f"el conteo semanal cuenta 1 cliente en fuga en A y nada en B: {cont}")
+av1 = [r for r in rows("select * from fuga_avisos_semanales()") if str(r["kiosco"]) == str(ka)]
+av2 = [r for r in rows("select * from fuga_avisos_semanales()") if str(r["kiosco"]) == str(ka)]
+ok(len(av1) == 1 and av1[0]["clientes"] == 1 and av2 == [], f"el aviso de fuga no se repite en la misma semana (idempotente): {av1} / {av2}")
+as_("authenticated", A)
 
 # ---- 2) Avisos "avisame cuando"
 r_venta = one("select regla_crear(%s, 'venta_supera', 3000)", (ka,))
