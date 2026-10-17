@@ -2,13 +2,14 @@
 import { useEffect, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import { peso } from "@/lib/whatsapp";
+import ProductosModificados from "@/components/ProductosModificados";
 
 type R = { pedidos: number; monto_pedidos: number; fiado_pendiente: number; deudores: number; sellos_semana: number; premios_semana: number; ultimo_ajuste: string | null; productos: number };
 
 export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "precios" | "fiado" | "reponer") => void }) {
   const [r, setR] = useState<R | null>(null);
   const [err, setErr] = useState(false);
-  const [stock, setStock] = useState<{ agotados: number; bajos: number } | null>(null);
+  const [stock, setStock] = useState<{ agotados: number; bajos: number; plata: number } | null>(null);
   const [vencido, setVencido] = useState<{ clientes: number; monto: number } | null>(null);
   useEffect(() => {
     supabase.rpc("resumen_semana", { p_kiosco: kiosco.id }).then(({ data, error }) => { if (error) setErr(true); else setR(data as R); });
@@ -22,7 +23,7 @@ export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "p
   useEffect(() => {
     supabase.rpc("reposicion_resumen", { p_kiosco: kiosco.id }).then(({ data }) => {
       const d = data as Record<string, number> | null;
-      if (d) setStock({ agotados: Number(d.agotados), bajos: Number(d.bajos) });
+      if (d) setStock({ agotados: Number(d.agotados), bajos: Number(d.bajos), plata: Number(d.plata_en_stock) });
     });
   }, [kiosco.id]);
 
@@ -46,6 +47,13 @@ export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "p
           <button onClick={() => onIr("fiado")}>Ver quién me debe</button>
         </div>
       )}
+      {stock && stock.plata > 0 && (
+        <div className="card">
+          <b>Dinero parado en mercadería</b>
+          <p className="mut">{peso(stock.plata)} entre stock y último costo</p>
+          <button className="sec" onClick={() => onIr("reponer")}>Ver para reponer</button>
+        </div>
+      )}
       {stock && stock.agotados + stock.bajos > 0 && (
         <div className="card">
           <b>Hay mercadería para reponer</b>
@@ -61,6 +69,7 @@ export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "p
         </div>
       )}
       {r.deudores > 0 && <button className="sec" onClick={() => onIr("fiado")}>Ver quién me debe</button>}
+      <ProductosModificados kiosco={kiosco} />
     </>
   );
 }
