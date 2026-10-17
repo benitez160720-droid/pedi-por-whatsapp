@@ -1,9 +1,13 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import { cantidadDesdeTexto, cantidadTexto } from "@/lib/compras";
 import { cantidadAInput, mensajeReposicion } from "@/lib/reposicion";
 import { peso } from "@/lib/whatsapp";
+import { resolverLectura, sumarLectura, type ProdCodigo } from "@/lib/conteo";
+import Escaner from "./Escaner";
+import VincularCelular from "./caja/VincularCelular";
+import { useVinculoCelular } from "./caja/useVinculoCelular";
 
 type Item = { producto_id: string; nombre: string; categoria: string; por_peso: boolean; stock_al_armar: number; stock_actual: number; contado: number | null };
 type Sesion = { id: string; criterio: "todos" | "bajo" | "categoria"; categoria: string | null; items: Item[] };
@@ -20,6 +24,13 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
   const [criterio, setCriterio] = useState<"todos" | "bajo" | "categoria">("todos");
   const [categoria, setCategoria] = useState("");
   const [categorias, setCategorias] = useState<string[]>([]);
+  const [codigos, setCodigos] = useState<ProdCodigo[]>([]);
+  const [camara, setCamara] = useState(false);
+  const [verVinculo, setVerVinculo] = useState(false);
+  const [lectura, setLectura] = useState("");
+  const editsRef = useRef(edits); editsRef.current = edits;
+  const sesionRef = useRef(sesion); sesionRef.current = sesion;
+  const codigosRef = useRef(codigos); codigosRef.current = codigos;
 
   const cargar = useCallback(async () => {
     const { data, error } = await supabase.rpc("conteo_actual", { p_kiosco: kiosco.id });
@@ -34,6 +45,54 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
     }
   }, [kiosco.id]);
   useEffect(() => { void cargar(); }, [cargar]);
+
+  // Códigos de barras / PLU de los productos de la planilla (en tandas: el límite de filas de la API es 1000).
+  const idsKey = sesion ? sesion.items.map((i) => i.producto_id).join(",") : "";
+  useEffect(() => {
+    if (!idsKey) { setCodigos([]); return; }
+    const ids = idsKey.split(",");
+    let vivo = true;
+    (async () => {
+      const acum: ProdCodigo[] = [];
+      for (let k = 0; k < ids.length; k += 150) {
+        const { data } = await supabase.from("productos").select("id,barcode,plu").eq("kiosco_id", kiosco.id).in("id", ids.slice(k, k + 150));
+        for (const r of data ?? []) acum.push({ id: r.id as string, barcode: (r.barcode as string | null) ?? null, plu: (r.plu as string | null) ?? null });
+      }
+      // Productos de la planilla que no están en la lista de arriba (otro kiosco) no se pueden escanear: no pasa nada.
+      if (vivo) setCodigos(acum);
+    })();
+    return () => { vivo = false; };
+  }, [idsKey, kiosco.id]);
+
+  // Un código leído (cámara o celular vinculado): suma 1 al producto, o los kilos de la etiqueta de balanza.
+  const procesarCodigo = useCallback((codigo: string) => {
+    const s = sesionRef.current;
+    if (!s) return;
+    const r = resolverLectura(codigo, codigosRef.current, s.items);
+    if (r.tipo === "nada") { setLectura(`No encontré ningún producto con el código ${codigo.trim()}.`); return; }
+    if (r.tipo === "fuera") { setLectura("Ese producto no está en esta planilla."); return; }
+    const item = s.items.find((i) => i.producto_id === r.producto_id)!;
+    const actual = editsRef.current[item.producto_id] ?? (item.contado === null ? "" : cantidadAInput(item.contado, item.por_peso));
+    const nuevo = sumarLectura(actual, item.por_peso, r.gramos);
+    setFiltro("");
+    if (nuevo === null) {
+      setLectura(item.por_peso && !r.gramos ? `${item.nombre} es por peso: pesalo y escribí los kilos (o escaneá la etiqueta de la balanza).` : `Revisá la cantidad de ${item.nombre}.`);
+    } else {
+      setEdits((prev) => ({ ...prev, [item.producto_id]: nuevo }));
+      setLectura(`${item.nombre}: ${nuevo}${item.por_peso ? " kg" : ""}`);
+    }
+    setTimeout(() => document.getElementById(`conteo-${item.producto_id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 50);
+  }, []);
+
+  const camaraQuiere = useRef(false);
+  const abrirCamara = (v: boolean) => { camaraQuiere.current = v; setCamara(v); };
+  const alLeerCamara = (codigo: string) => {
+    // La cámara se cierra sola tras cada lectura; se reabre con una pausa para no leer dos veces la misma etiqueta.
+    setCamara(false); procesarCodigo(codigo);
+    setTimeout(() => { if (camaraQuiere.current) setCamara(true); }, 900);
+  };
+  useEffect(() => () => { camaraQuiere.current = false; }, []);
+  const vinculo = useVinculoCelular({ kioscoId: kiosco.id, onCodigo: procesarCodigo });
 
   const visibles = useMemo(() => {
     const q = filtro.trim().toLowerCase();
@@ -148,6 +207,14 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
       <p className="mut">Escribí lo que hay en el estante. Dejá en blanco lo que todavía no contaste. Por peso, en kilos.</p>
       {msg && <p role="alert" className="pos-error">{msg}</p>}
       {resultado && <p role="status" className="ok">{resultado}</p>}
+      <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 8, margin: ".5rem 0" }}>
+        <button className="sec" onClick={() => abrirCamara(!camaraQuiere.current)}>{camara ? "Cerrar cámara" : "📷 Escanear con la cámara"}</button>
+        <button className="sec" onClick={() => { vinculo.vincular(); setVerVinculo(true); }}>📱 {vinculo.estado === "conectado" ? "Celular conectado" : "Usar el celular como lector"}</button>
+      </div>
+      {camara && <Escaner onCode={alLeerCamara} onClose={() => abrirCamara(false)} />}
+      {lectura && <p role="status" className="mut"><b>{lectura}</b></p>}
+      {verVinculo && <VincularCelular estado={vinculo.estado} url={vinculo.url} error={vinculo.error} ultimo={vinculo.ultimo} onCerrarVinculo={() => { vinculo.cerrar(); setVerVinculo(false); }} onOcultar={() => setVerVinculo(false)} />}
+      <p className="mut" style={{ fontSize: 12 }}>Cada lectura suma 1 al producto. Si te pasás, corregí el número a mano.</p>
       <input placeholder="Buscar producto…" value={filtro} onChange={(e) => setFiltro(e.target.value)} />
 
       {visibles.map((i) => {
@@ -155,7 +222,7 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
         const n = cantidadDesdeTexto(txt, i.por_peso);
         const cambio = n !== null && n !== i.stock_actual;
         return (
-          <div className="card" key={i.producto_id} style={{ margin: ".4rem 0" }}>
+          <div className="card" id={`conteo-${i.producto_id}`} key={i.producto_id} style={{ margin: ".4rem 0" }}>
             <div className="row"><b>{i.nombre}</b><span className="mut">Sistema: {cantidadTexto(i.stock_actual, i.por_peso)}</span></div>
             <input inputMode="decimal" placeholder="Contado" value={txt} onChange={(e) => setEdits({ ...edits, [i.producto_id]: e.target.value })}
               style={cambio ? { borderColor: "#e67e22" } : undefined} />

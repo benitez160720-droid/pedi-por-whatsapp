@@ -294,38 +294,39 @@ Recomendación: hacer el punto 9 en paralelo desde el principio, porque cada mig
 ## 8. Checklist final
 
 **Fase 1**
-- [ ] Columnas `stock_minimo`, `stock_objetivo`, `lead_time_dias`, `proveedor_default_id` y grants sin exponerlas a `anon`
-- [ ] Campos nuevos en edición de producto y en carga masiva
-- [ ] Función de reposición con ventas de mostrador y pedidos
-- [ ] Manejo de producto sin historial, sin proveedor y por peso
-- [ ] Pantalla "Para reponer" agrupada por proveedor
-- [ ] Botón "Pedir por WhatsApp" y precarga de compra
-- [ ] Cron diario con secreto y recorrido de todos los kioscos
-- [ ] Push de resumen idempotente y banner en el panel
-- [ ] Stock en `resumen_semana`
-- [ ] Agregar stock rápido en el POS con PIN
-- [ ] Tests de base (caso feliz, bordes y aislamiento entre kioscos)
+- [x] Columnas `stock_minimo`, `stock_objetivo`, `lead_time_dias`, `proveedor_default_id` y grants sin exponerlas a `anon`
+- [x] Campos nuevos en edición de producto y en carga masiva
+- [x] Función de reposición con ventas de mostrador y pedidos
+- [x] Manejo de producto sin historial, sin proveedor y por peso
+- [x] Pantalla "Para reponer" agrupada por proveedor
+- [x] Botón "Pedir por WhatsApp" y precarga de compra
+- [x] Cron diario con secreto y recorrido de todos los kioscos
+- [x] Push de resumen idempotente y banner en el panel
+- [x] Stock en `resumen_semana`
+- [x] Agregar stock rápido en el POS con PIN
+- [x] Tests de base (caso feliz, bordes y aislamiento entre kioscos)
+- [x] Pedido a proveedor como documento con estados (opcional; migración 0027, falta aplicarla en producción)
 
 **Fase 2**
-- [ ] Tipos de movimiento ampliados y ventas/devoluciones registradas
-- [ ] Test de que el saldo del historial coincide con el stock
-- [ ] Motivo estructurado en el ajuste de stock
-- [ ] Reporte de mermas valorizado
-- [ ] Conteo por planilla con escáner
-- [ ] Costo y margen visibles y sugerencia de precio por costo
-- [ ] Panel de productos modificados
+- [x] Tipos de movimiento ampliados y ventas/devoluciones registradas
+- [x] Test de que el saldo del historial coincide con el stock
+- [x] Motivo estructurado en el ajuste de stock
+- [x] Reporte de mermas valorizado
+- [x] Conteo por planilla con escáner (cámara y celular vinculado; falta probar en el celular)
+- [x] Costo y margen visibles y sugerencia de precio por costo
+- [x] Panel de productos modificados
 
 **Fase 3 (opcional)**
-- [ ] Lotes, vencimientos y FEFO
-- [ ] Reglas "avisame cuando"
-- [ ] Resumen semanal de fiado y clientes inactivos
-- [ ] Curva ABC
+- [x] Lotes, vencimientos y FEFO
+- [x] Reglas "avisame cuando"
+- [x] Resumen semanal de fiado y clientes inactivos
+- [x] Curva ABC
 
 **Operación**
-- [ ] Workflow de CI con typecheck y tests
-- [ ] Chequeo automático de RLS y `search_path`
-- [ ] Backup programado y restauración probada
-- [ ] Mensajes de error amigables para cada error nuevo
+- [x] Workflow de CI con typecheck y tests
+- [x] Chequeo automático de RLS y `search_path`
+- [x] Backup programado y restauración probada (backup listo; falta correr el workflow de restauración corregido en GitHub)
+- [x] Mensajes de error amigables para cada error nuevo
 
 ---
 
@@ -335,5 +336,5 @@ Recomendación: hacer el punto 9 en paralelo desde el principio, porque cada mig
 2. Si el stock de pedidos se descuenta al confirmar (así dice `0009`), para decidir si hace falta contar la demanda comprometida.
 3. Límites del plan de Vercel para crons, o disponibilidad de `pg_cron` y `pg_net` en tu proyecto de Supabase.
 4. Qué hacer con el stock existente al introducir `stock_minimo`: sugerencia de valor inicial (por ejemplo, la venta de unos días) para que la primera corrida no llene la lista de avisos.
-5. Si querés guardar los pedidos a proveedores como documento (con estados) o alcanza con el mensaje de WhatsApp y la compra posterior.
+5. (Resuelto: se hizo, ver 0027) Si querés guardar los pedidos a proveedores como documento (con estados) o alcanza con el mensaje de WhatsApp y la compra posterior.
 6. El archivo `.env.local` viene dentro de `app.zip`. El README dice que solo tiene URL y la anon key (pública por diseño), pero conviene confirmarlo y no compartir nunca el zip si alguna vez se agrega la `SUPABASE_SERVICE_ROLE_KEY` ahí.

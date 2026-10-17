@@ -1,5 +1,30 @@
 # Changelog
 
+## fase3-completo v4 — 2026-10-17
+
+### Agregado
+- Pedidos a proveedor como documento con estados (plan 1.4 / 9.5, opcional): `supabase/migrations/0027_pedidos_proveedor.sql` (tablas `pedidos_proveedor` y `pedido_proveedor_items`, RLS solo lectura para el dueño, funciones `pedido_proveedor_crear / enviar / cancelar / recibir / cerrar`). Estados `borrador → enviada → recibida_parcial → recibida` o `cancelada`. Recepción estricta y atómica: no se recibe más de lo pendiente. El pedido no mueve stock ni deuda; la compra se sigue cargando con `registrar_compra`.
+- `components/PedidosProveedor.tsx`: lista de pedidos abiertos y anteriores, "Registrar lo que llegó" (con "Llegó todo"), cerrar sin lo que falta, cancelar, y botón para precargar la compra con lo recibido.
+- `components/Reponer.tsx`: "Guardar borrador" y "Pedir por WhatsApp" ahora dejan el pedido registrado.
+- `lib/pedidos-proveedor.ts`, `tests/pedidos-proveedor.test.mjs` (`npm run test:pedidos`) y `supabase/tests/etapa22_test.py` (35 chequeos: estados, aislamiento entre kioscos, atomicidad, anon).
+
+### Importante
+- La migración 0027 **no está aplicada en producción**: hay que aplicarla antes de usar la pantalla. Sin ella, "Guardar borrador" y "Pedir por WhatsApp" muestran el error genérico (el WhatsApp igual se abre).
+
+## fase3-completo v3 — 2026-10-17
+
+### Agregado
+- Conteo con escáner (plan 2.4): en `Conteo.tsx`, botón "📷 Escanear con la cámara" y "📱 Usar el celular como lector" (reusa `Escaner.tsx` y `useVinculoCelular`). Cada lectura suma 1 al producto y lo deja a la vista; las etiquetas de balanza suman sus kilos; un producto por peso con código común pide escribir los kilos. Se puede corregir a mano. Códigos desconocidos o de productos fuera de la planilla avisan sin tocar nada.
+- `lib/conteo.ts` y `tests/conteo.test.mjs` (`npm run test:conteo`, ya dentro de `npm test`).
+
+### Cambiado
+- `docs/PLAN_STOCK_Y_AUTOMATIZACION.md`: checklist final tildado según lo verificado. Quedan sin tildar el backup con restauración probada (falta correr el workflow en GitHub). El pedido a proveedor como documento con estados sigue sin hacerse (opcional).
+
+### Sin cambios / no incluido
+- Prueba en el celular del escáner en el conteo: requiere cámara y sesión.
+- Lector USB en el conteo: no incluido (los campos de texto lo recibirían como tipeo).
+- Pendientes de operación de la v2 (rotar `PUSH_WEBHOOK_SECRET`, PR #9, workflow de restauración, protección de contraseñas filtradas).
+
 ## fase3-completo v2 — 2026-10-17
 
 Reconstruida sobre el ZIP de `main` (que no tenía la última tanda) y la base de producción. Verificada: `check:migraciones` (26), `typecheck`, `npm test` y todos los tests SQL de `supabase/tests`.

@@ -7,6 +7,8 @@ import {
   ETIQUETA_ESTADO, agruparPorProveedor, cantidadAInput, costoEstimado, mensajePedidoProveedor, mensajeReposicion,
   normalizarFila, textoDias, type FilaReposicion, type ResumenRepo,
 } from "@/lib/reposicion";
+import { mensajePedido } from "@/lib/pedidos-proveedor";
+import PedidosProveedor from "./PedidosProveedor";
 
 // Cantidades editables por producto (texto tal como lo escribe la persona: kg si es por peso).
 type Edits = Record<string, string>;
@@ -18,6 +20,7 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
   const [msg, setMsg] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [clases, setClases] = useState<Record<string, string>>({});
+  const [refrescoPedidos, setRefrescoPedidos] = useState(0);
 
   const cargar = useCallback(async () => {
     const [{ data: f, error: e1 }, { data: r, error: e2 }] = await Promise.all([
@@ -51,6 +54,19 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
     const n = Number((data as { actualizados?: number })?.actualizados ?? 0);
     setMsg(n > 0 ? `Listo: le puse mínimo a ${n} producto${n > 1 ? "s" : ""} según lo que vendés.` : "No hay productos nuevos para poner mínimo.");
     await cargar();
+  }
+
+  // Guarda lo que se va a pedir como documento (borrador o ya enviado) para poder marcar después qué llegó.
+  async function guardarPedido(proveedorId: string, lineas: { producto_id: string; cantidad: number }[], enviar: boolean) {
+    setOcupado(true); setMsg("");
+    const { error } = await supabase.rpc("pedido_proveedor_crear", {
+      p_kiosco: kiosco.id, p_proveedor: proveedorId, p_enviar: enviar,
+      p_items: lineas.filter((l) => l.cantidad > 0).map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad })),
+    });
+    setOcupado(false);
+    if (error) return setMsg(mensajePedido(error.message));
+    setMsg(enviar ? "Pedido guardado como enviado ✔" : "Borrador guardado ✔ Lo encontrás abajo, en Pedidos a proveedores.");
+    setRefrescoPedidos((n) => n + 1);
   }
 
   const fila = (f: FilaReposicion) => (
@@ -127,8 +143,9 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
                 Registrar compra con esto
               </button>
             )}
+            {pedidos.length > 0 && <button className="sec" style={{ marginRight: 8 }} disabled={ocupado} onClick={() => guardarPedido(g.proveedor_id, pedidos, false)}>Guardar borrador</button>}
             {tel && pedidos.length > 0
-              ? <a className="btn" href={linkWhatsApp(tel, mensajePedidoProveedor(kiosco.nombre, g.nombre, pedidos))} target="_blank" rel="noopener">Pedir por WhatsApp</a>
+              ? <a className="btn" href={linkWhatsApp(tel, mensajePedidoProveedor(kiosco.nombre, g.nombre, pedidos))} target="_blank" rel="noopener" onClick={() => void guardarPedido(g.proveedor_id, pedidos, true)}>Pedir por WhatsApp</a>
               : <p className="mut">{tel ? "No hay cantidades para pedir." : "Este proveedor no tiene teléfono cargado. Completalo en Proveedores."}</p>}
           </section>
         );
@@ -146,6 +163,7 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
           ))}
         </section>
       )}
+      <PedidosProveedor kiosco={kiosco} refresco={refrescoPedidos} onComprar={onComprar} />
     </>
   );
 }
