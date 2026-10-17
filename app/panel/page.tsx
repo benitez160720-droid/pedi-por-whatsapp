@@ -70,7 +70,23 @@ function CrearKiosco({ userId, onListo }: { userId: string; onListo: () => void 
 }
 
 type Tab = "pedidos" | "productos" | "fiado" | "caja" | "sellos" | "precios" | "resumen" | "local";
-const TABS: [Tab, string][] = [["pedidos", "Pedidos"], ["productos", "Productos"], ["fiado", "Fiado"], ["caja", "Caja"], ["sellos", "Sellos"], ["precios", "Precios"], ["resumen", "Resumen"], ["local", "Mi local"]];
+type Grupo = { titulo: string; items: [Tab, string, string][] };
+// Ícono (trazo) por sección, para el menú lateral.
+const ICONOS: Record<Tab, string> = {
+  pedidos: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 3h6v4H9zM9 12l2 2 4-4",
+  caja: "M3 7h18v12H3zM3 7l3-4h12l3 4M8 13h.01M12 13h4",
+  fiado: "M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3zM8 9h8M8 13h5",
+  productos: "M21 16V8l-9-5-9 5v8l9 5zM3.3 7.5 12 12.5l8.7-5M12 22V12.5",
+  precios: "M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2.8 12.8A2 2 0 0 1 2.2 11.4l.5-7.7a1 1 0 0 1 1-1l7.7-.5a2 2 0 0 1 1.4.6l7.8 7.8a2 2 0 0 1 0 2.8zM7.5 7.5h.01",
+  sellos: "M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z",
+  resumen: "M4 20V10M10 20V4M16 20v-8M22 20H2",
+  local: "M3 10l1.5-6h15L21 10M4 10v10h16V10M9 20v-6h6v6",
+};
+const GRUPOS: Grupo[] = [
+  { titulo: "Vender", items: [["caja", "Caja", "Punto de venta"], ["pedidos", "Pedidos", "WhatsApp y tienda"], ["fiado", "Fiado", "Cuentas corrientes"]] },
+  { titulo: "Catálogo", items: [["productos", "Productos", "Stock y fotos"], ["precios", "Precios", "Ajustes masivos"]] },
+  { titulo: "Negocio", items: [["resumen", "Resumen", "Ventas y balance"], ["sellos", "Sellos", "Fidelización"], ["local", "Mi local", "Datos y horarios"]] },
+];
 
 function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
   const [tab, setTab] = useState<Tab>("pedidos");
@@ -81,27 +97,49 @@ function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
   const detalle = estado === "fuera_de_horario" ? `Fuera de horario${textoApertura(kiosco.horarios ?? {}, ahora) ? ` · ${textoApertura(kiosco.horarios, ahora)}` : ""}`
     : estado === "pausada" ? (kiosco.horario_auto ? "Pausada: no recibe pedidos aunque esté en horario" : "Cerrada") : kiosco.horario_auto ? "Abierta (según tu horario)" : "Abierta";
   return (
-    <>
-      <div className="row"><h1>{kiosco.nombre}</h1><button className="sec" onClick={() => supabase.auth.signOut()}>Salir</button></div>
-      <div className="card row">
-        <span>Tienda: <b className={abierta ? "ok" : undefined} style={abierta ? undefined : { color: "#c0392b" }}>{detalle}</b></span>
-        <button className="sec" onClick={async () => { await supabase.from("kioscos").update({ abierto: !kiosco.abierto }).eq("id", kiosco.id); recargar(); }}>
-          {kiosco.horario_auto ? (kiosco.abierto ? "Pausar" : "Reanudar") : kiosco.abierto ? "Cerrar" : "Abrir"}
-        </button>
-      </div>
-      <Avisos kiosco={kiosco} />
-      <QrKiosco slug={kiosco.slug} nombre={kiosco.nombre} />
-      <div className="tabs">
-        {TABS.map(([k, label]) => (<button key={k} className={tab === k ? "" : "sec"} onClick={() => setTab(k)}>{label}</button>))}
-      </div>
-      {tab === "pedidos" && <Pedidos kiosco={kiosco} />}
-      {tab === "productos" && <Productos kiosco={kiosco} />}
-      {tab === "fiado" && <Fiado kiosco={kiosco} />}
-      {tab === "caja" && <Caja kiosco={kiosco} />}
-      {tab === "sellos" && <Sellos kiosco={kiosco} />}
-      {tab === "precios" && <Precios kiosco={kiosco} />}
-      {tab === "resumen" && <Resumen kiosco={kiosco} onIr={setTab} />}
-      {tab === "local" && <MiKiosco kiosco={kiosco} onGuardado={recargar} />}
-    </>
+    <div className="panel-shell">
+      <aside className="side" aria-label="Menú del panel">
+        <div className="side-marca">
+          <span className="side-nombre">{kiosco.nombre}</span>
+          <span className={`side-estado${abierta ? " on" : ""}`}>{abierta ? "Tienda abierta" : "Tienda cerrada"}</span>
+        </div>
+        <nav className="side-nav">
+          {GRUPOS.map((g) => (
+            <div className="side-grupo" key={g.titulo}>
+              <span className="side-titulo">{g.titulo}</span>
+              {g.items.map(([k, label, sub]) => (
+                <button key={k} className={`side-item${tab === k ? " on" : ""}`} onClick={() => setTab(k)} aria-current={tab === k ? "page" : undefined} title={sub}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICONOS[k]} /></svg>
+                  <span className="side-label">{label}<small>{sub}</small></span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="side-pie">
+          <button className="sec" onClick={async () => { await supabase.from("kioscos").update({ abierto: !kiosco.abierto }).eq("id", kiosco.id); recargar(); }}>
+            {kiosco.horario_auto ? (kiosco.abierto ? "Pausar tienda" : "Reanudar tienda") : kiosco.abierto ? "Cerrar tienda" : "Abrir tienda"}
+          </button>
+          <button className="sec" onClick={() => supabase.auth.signOut()}>Salir</button>
+        </div>
+      </aside>
+      <section className="panel-main">
+        {tab !== "caja" && (
+          <>
+            <div className="card row"><span>Tienda: <b className={abierta ? "ok" : undefined} style={abierta ? undefined : { color: "#c0392b" }}>{detalle}</b></span></div>
+            <Avisos kiosco={kiosco} />
+            <QrKiosco slug={kiosco.slug} nombre={kiosco.nombre} />
+          </>
+        )}
+        {tab === "pedidos" && <Pedidos kiosco={kiosco} />}
+        {tab === "productos" && <Productos kiosco={kiosco} />}
+        {tab === "fiado" && <Fiado kiosco={kiosco} />}
+        {tab === "caja" && <Caja kiosco={kiosco} />}
+        {tab === "sellos" && <Sellos kiosco={kiosco} />}
+        {tab === "precios" && <Precios kiosco={kiosco} />}
+        {tab === "resumen" && <Resumen kiosco={kiosco} onIr={setTab} />}
+        {tab === "local" && <MiKiosco kiosco={kiosco} onGuardado={recargar} />}
+      </section>
+    </div>
   );
 }
