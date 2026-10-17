@@ -44,11 +44,11 @@ eq("mensaje de pedido", msg, "Hola Distribuidora! Te paso el pedido de Kiosco Su
 eq("costo estimado", R.costoEstimado([{ cantidad: 10, por_peso: false, costo: 700 }, { cantidad: 500, por_peso: true, costo: 6000 }, { cantidad: 3, por_peso: false, costo: null }, { cantidad: 2, por_peso: false, costo: 0 }]), { total: 10000, sinCosto: 2 });
 
 // textos
-eq("texto de días", [R.textoDias({ estado: "agotado", dias_restantes: null }), R.textoDias({ estado: "bajo", dias_restantes: null }), R.textoDias({ estado: "critico", dias_restantes: 0.4 }), R.textoDias({ estado: "critico", dias_restantes: 2.5 })], ["Sin stock", "Bajo el mínimo", "Menos de 1 día", "Alcanza 2,5 días"]);
+eq("texto de días", [R.textoDias({ estado: "agotado", dias_restantes: null }), R.textoDias({ estado: "bajo", dias_restantes: null }), R.textoDias({ estado: "critico", dias_restantes: 0.4 }), R.textoDias({ estado: "critico", dias_restantes: 2.5 })], ["Se acabó", "Bajo el mínimo", "Menos de 1 día", "Alcanza 2,5 días"]);
 
 // aviso push
-eq("aviso con todo", R.armarAvisoStock({ agotados: 2, bajos: 4, sin_proveedor: 1 }), { title: "Hay que reponer mercadería", body: "2 agotados · 4 por acabarse · 1 sin proveedor asignado", url: "/panel?tab=reponer" });
-eq("aviso singular y sin proveedor 0", R.armarAvisoStock({ agotados: 1, bajos: 0, sin_proveedor: 0 }).body, "1 agotado");
+eq("aviso con todo", R.armarAvisoStock({ agotados: 2, bajos: 4, sin_proveedor: 1 }), { title: "Hay que reponer mercadería", body: "2 se acabaron · 4 quedan poco · 1 sin proveedor asignado", url: "/panel?tab=reponer" });
+eq("aviso singular y sin proveedor 0", R.armarAvisoStock({ agotados: 1, bajos: 0, sin_proveedor: 0 }).body, "1 se acabó");
 eq("mensaje de error", [R.mensajeReposicion("pin_requerido").includes("PIN"), R.mensajeReposicion("xyz")], [true, "No se pudo completar la operación."]);
 
 console.log(fallos ? `\n${fallos} FALLAS` : "\nreposicion: todo OK");

@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useEffect, useMemo, useState } from "react";
 import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
 import Link from "next/link";
@@ -25,6 +26,7 @@ const leer = <T,>(k: string, def: T): T => { try { const v = localStorage.getIte
 const guardarLS = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* modo privado: se ignora */ } };
 
 export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; productos: Producto[] }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const kCart = `cart:${kiosco.slug}`;
   const [cart, setCart] = useState<Record<string, number>>({});
   const [hidratado, setHidratado] = useState(false);
@@ -114,6 +116,7 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
     const ok = nombre.trim().length >= 2 && tel.replace(/\D/g, "").length >= 8 && (modalidad === "retiro" || dir.trim().length >= 3) && !bajoMinimo && !cerrado;
     return (
       <>
+      {ventanaConfirmar}
         <button className="sec" onClick={() => setPaso("catalogo")}>← Seguir agregando</button>
         <h1>Tu pedido</h1>
         <div className="recibo">
@@ -152,7 +155,7 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
         {error && <p role="alert" className="alerta">{error}</p>}
         <button className="ancho" disabled={!ok || enviando} onClick={enviar}>{enviando ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>
         <p className="mut">Usamos tu nombre y teléfono solo para gestionar este pedido con {kiosco.nombre}. <Link href="/privacidad">Política de privacidad</Link>.</p>
-        <button className="sec" onClick={() => { if (confirm("¿Vaciar el pedido?")) { setCart({}); setPaso("catalogo"); } }}>Vaciar pedido</button>
+        <button className="sec" onClick={async () => { if (await confirmar({ titulo: "¿Vaciar el pedido?", confirmar: "Sí, seguir", peligro: true })) { setCart({}); setPaso("catalogo"); } }}>Vaciar pedido</button>
       </>
     );
   }

@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
 import type { Seleccion } from "@/lib/etiquetas";
@@ -19,6 +20,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
   // Compra armada desde "Para reponer": abre el proveedor con las líneas cargadas para revisar y guardar.
   precarga?: { proveedorId: string; lineas: LineaCompra[] } | null; onPrecargaUsada?: () => void;
 }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [ultima, setUltima] = useState<Seleccion[]>([]);
   const [vista, setVista] = useState<"proveedores" | "stock">("proveedores");
   const [lista, setLista] = useState<Proveedor[]>([]);
@@ -128,7 +130,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
       const v = variacionCosto(productos.find((x) => x.id === l.producto_id)?.costo, l.costo);
       return v ? `• ${l.nombre}: ${peso(v.anterior)} → ${peso(v.nuevo)} (${v.pct > 0 ? "+" : ""}${v.pct}%)` : null;
     }).filter((x): x is string => x !== null);
-    if (cambios.length && !confirm(`Hay costos que cambiaron más de ${UMBRAL_VARIACION_COSTO}%:\n${cambios.join("\n")}\n\n¿Guardar la compra igual?`)) return;
+    if (cambios.length && !await confirmar({ titulo: `Hay costos que cambiaron más de ${UMBRAL_VARIACION_COSTO}%:\n${cambios.join("\n")}\n\n¿Guardar la compra igual?`, confirmar: "Sí, seguir", peligro: false })) return;
     const pag = pagaAhora.trim() === "" ? 0 : num(pagaAhora);
     if (!(pag >= 0) || pag > total) return setMsg("Lo que pagás ahora no puede superar el total.");
     setOcupado(true); setMsg("");
@@ -144,7 +146,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
     setMsg(`Compra #${data?.numero ?? ""} registrada ✔ Stock actualizado.`); await refrescar(p.id);
   }
   async function anular(p: Proveedor, c: Compra) {
-    if (!window.confirm(`¿Anular la compra #${c.numero}? Se resta el stock que sumó y se borra su deuda.`)) return;
+    if (!await confirmar({ titulo: `¿Anular la compra #${c.numero}? Se resta el stock que sumó y se borra su deuda.`, confirmar: "Sí, seguir", peligro: true })) return;
     const { error } = await supabase.rpc("anular_compra", { p_compra: c.id });
     if (error) return setMsg(mensajeCompras(error.message));
     setMsg("Compra anulada ✔"); await refrescar(p.id);
@@ -167,6 +169,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
   const controlados = productos.filter((p) => p.stock_controlado);
   return (
     <>
+      {ventanaConfirmar}
       <div className="row" style={{ justifyContent: "flex-start", gap: 8, flexWrap: "wrap" }}>
         <button className={vista === "proveedores" ? "" : "sec"} onClick={() => setVista("proveedores")}>Proveedores</button>
         <button className={vista === "stock" ? "" : "sec"} onClick={() => setVista("stock")}>Movimientos de stock</button>
@@ -185,7 +188,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
           {lista.map((p) => (
             <div className="card" key={p.id}>
               <div className="row" onClick={() => abrir(p.id)} style={{ cursor: "pointer" }}>
-                <b>{p.nombre}</b><b style={{ color: p.saldo > 0 ? "#c0392b" : undefined }}>{peso(p.saldo)}</b>
+                <b>{p.nombre}</b><b style={{ color: p.saldo > 0 ? "var(--danger)" : undefined }}>{peso(p.saldo)}</b>
               </div>
               {abierto === p.id && (
                 <>
@@ -258,7 +261,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
           {form && (
             <div className="card">
               <h3 style={{ marginTop: 0 }}>{form.id ? "Editar proveedor" : "Nuevo proveedor"}</h3>
-              <input placeholder="Nombre" value={form.nombre} maxLength={80} onChange={(e) => setForm({ ...form, nombre: e.target.value })} autoFocus />
+              <input placeholder="Nombre" aria-label="Nombre del proveedor" value={form.nombre} maxLength={80} onChange={(e) => setForm({ ...form, nombre: e.target.value })} autoFocus />
               <input placeholder="Teléfono (opcional)" value={form.telefono} maxLength={30} inputMode="tel" onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
               <input placeholder="CUIT (opcional)" value={form.cuit} maxLength={20} onChange={(e) => setForm({ ...form, cuit: e.target.value })} />
               <input placeholder="Notas, ej. días de visita (opcional)" value={form.notas} maxLength={300} onChange={(e) => setForm({ ...form, notas: e.target.value })} />
@@ -314,7 +317,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
             return (
               <div className="card" key={h.id}>
                 <div className="row"><b>{h.productos?.nombre ?? "Producto eliminado"}</b>
-                  <b style={{ color: h.cantidad > 0 ? "#1e8449" : "#c0392b" }}>{h.cantidad > 0 ? "+" : "−"}{cantidadTexto(Math.abs(h.cantidad), pp)}</b></div>
+                  <b style={{ color: h.cantidad > 0 ? "var(--ok)" : "var(--danger)" }}>{h.cantidad > 0 ? "+" : "−"}{cantidadTexto(Math.abs(h.cantidad), pp)}</b></div>
                 <div className="mut">{fecha(h.created_at)} · {h.tipo === "ajuste" ? `Ajuste · ${ETIQUETA_MOTIVO[h.motivo_tipo ?? "manual"] ?? "Manual"}` : (ETIQUETA_TIPO_MOV[h.tipo] ?? h.tipo)} · quedó en {cantidadTexto(h.stock_resultante, pp)}{h.motivo ? ` · ${h.motivo}` : ""}</div>
               </div>
             );

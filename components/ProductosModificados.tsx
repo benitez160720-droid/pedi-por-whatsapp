@@ -52,7 +52,7 @@ export default function ProductosModificados({ kiosco }: { kiosco: Kiosco }) {
         <input type="checkbox" checked={incluir} onChange={(e) => setIncluir(e.target.checked)} />
         <span className="mut">Incluir ventas, pedidos y devoluciones</span>
       </label>
-      {err && <p role="alert" style={{ color: "#c0392b" }}>No pudimos cargar los cambios de stock.</p>}
+      {err && <p role="alert" style={{ color: "var(--danger)" }}>No pudimos cargar los cambios de stock.</p>}
       {!err && !movs && <p className="mut">Cargando…</p>}
       {movs && filas.length === 0 && <p className="mut">Sin cambios de stock en este período.</p>}
       {filas.map((f) => (

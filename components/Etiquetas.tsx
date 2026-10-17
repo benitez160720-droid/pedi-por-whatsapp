@@ -125,12 +125,12 @@ export default function Etiquetas({ kiosco, precarga, onPrecargaUsada }: { kiosc
           {PRESETS.map(([n, p]) => <button key={n} className="sec" onClick={() => aplicarPreset(p)}>{n}</button>)}
         </div>
         <div className="etq-form">
-          <div><label>Ancho (mm)</label><input inputMode="decimal" value={cfgValor("ancho_mm")} onChange={(e) => setMedida("ancho_mm", e.target.value)} /></div>
-          <div><label>Alto (mm)</label><input inputMode="decimal" value={cfgValor("alto_mm")} onChange={(e) => setMedida("alto_mm", e.target.value)} /></div>
-          <div><label>Columnas</label><input inputMode="numeric" value={cfgValor("columnas")} onChange={(e) => setMedida("columnas", e.target.value)} /></div>
-          <div><label>Margen (mm)</label><input inputMode="decimal" value={cfgValor("margen_mm")} onChange={(e) => setMedida("margen_mm", e.target.value)} /></div>
+          <div><label htmlFor="cfg-ancho">Ancho (mm)</label><input id="cfg-ancho" inputMode="decimal" value={cfgValor("ancho_mm")} onChange={(e) => setMedida("ancho_mm", e.target.value)} /></div>
+          <div><label htmlFor="cfg-alto">Alto (mm)</label><input id="cfg-alto" inputMode="decimal" value={cfgValor("alto_mm")} onChange={(e) => setMedida("alto_mm", e.target.value)} /></div>
+          <div><label htmlFor="cfg-col">Columnas</label><input id="cfg-col" inputMode="numeric" value={cfgValor("columnas")} onChange={(e) => setMedida("columnas", e.target.value)} /></div>
+          <div><label htmlFor="cfg-margen">Margen (mm)</label><input id="cfg-margen" inputMode="decimal" value={cfgValor("margen_mm")} onChange={(e) => setMedida("margen_mm", e.target.value)} /></div>
           <div><label>Tipo de código</label>
-            <select value={config.simbologia} onChange={(e) => setConfig((c) => ({ ...c, simbologia: e.target.value as ConfigEtiquetas["simbologia"] }))}>
+            <select aria-label="Tipo de código de barras" value={config.simbologia} onChange={(e) => setConfig((c) => ({ ...c, simbologia: e.target.value as ConfigEtiquetas["simbologia"] }))}>
               <option value="auto">Automático</option><option value="ean13">EAN-13 cuando se pueda</option><option value="code128">Siempre Code 128</option>
             </select></div>
         </div>
@@ -142,7 +142,7 @@ export default function Etiquetas({ kiosco, precarga, onPrecargaUsada }: { kiosc
 
       <div className="card no-print">
         <h3>Productos a imprimir</h3>
-        <input type="search" placeholder="Buscar por nombre, código o PLU" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <input type="search" aria-label="Buscar producto para el cartel" placeholder="Buscar por nombre, código o PLU" value={busca} onChange={(e) => setBusca(e.target.value)} />
         {resultados.map((p) => (
           <div key={p.id} className="row" style={{ marginTop: 6 }}>
             <span>{p.nombre} <span className="mut">· {peso(p.precio)}{p.vendido_por_peso ? "/kg" : ""}</span></span>

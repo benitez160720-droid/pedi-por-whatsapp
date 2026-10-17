@@ -12,7 +12,7 @@ function aBytes(b64: string): BufferSource {
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
 }
 
-export default function Avisos({ kiosco }: { kiosco: Kiosco }) {
+export default function Avisos({ kiosco, soloPendiente = false }: { kiosco: Kiosco; soloPendiente?: boolean }) {
   const [estado, setEstado] = useState<Estado>("cargando");
   const [msg, setMsg] = useState("");
 
@@ -50,6 +50,7 @@ export default function Avisos({ kiosco }: { kiosco: Kiosco }) {
   }
 
   if (estado === "cargando" || estado === "no_soportado" || estado === "sin_clave") return null;
+  if (soloPendiente && estado === "activo" && !msg) return null;
   return (
     <div className="card row">
       {estado === "activo" && <span>Avisos de pedidos <b className="ok">activados</b> en este celular</span>}

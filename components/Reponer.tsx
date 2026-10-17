@@ -9,6 +9,7 @@ import {
 } from "@/lib/reposicion";
 import { mensajePedido } from "@/lib/pedidos-proveedor";
 import PedidosProveedor from "./PedidosProveedor";
+import Pantalla from "@/components/ui/Pantalla";
 
 // Cantidades editables por producto (texto tal como lo escribe la persona: kg si es por peso).
 type Edits = Record<string, string>;
@@ -73,7 +74,7 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
     <div className="card" key={f.producto_id} style={{ margin: ".4rem 0" }}>
       <div className="row">
         <b>{f.nombre}</b>{clases[f.producto_id] && <span className="mut" style={{ marginLeft: 6, fontSize: 12 }}>Clase {clases[f.producto_id]}</span>}
-        <span className={f.estado === "agotado" ? "" : "mut"} style={f.estado === "agotado" ? { color: "#c0392b" } : undefined}>
+        <span className={f.estado === "agotado" ? "" : "mut"} style={f.estado === "agotado" ? { color: "var(--danger)" } : undefined}>
           {ETIQUETA_ESTADO[f.estado]}
         </span>
       </div>
@@ -87,15 +88,14 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
     </div>
   );
 
-  if (filas === null) return msg ? <p role="alert" style={{ color: "#c0392b" }}>{msg}</p> : <p className="mut">Cargando…</p>;
+  if (filas === null) return msg ? <p role="alert" style={{ color: "var(--danger)" }}>{msg}</p> : <p className="mut">Cargando…</p>;
 
   const hayAlgo = filas.length > 0;
   return (
-    <>
-      <h2>Para reponer</h2>
+    <Pantalla titulo="Qué comprar" ayuda="Acá ves lo que se agotó o se está por acabar, con cuánto pedir a cada proveedor. Tocá “Pedir por WhatsApp” y se arma el mensaje solo.">
       {resumen && (
         <div className="card row" style={{ flexWrap: "wrap", gap: 8 }}>
-          <span>Agotados <b style={{ color: resumen.agotados ? "#c0392b" : undefined }}>{resumen.agotados}</b></span>
+          <span>Agotados <b style={{ color: resumen.agotados ? "var(--danger)" : undefined }}>{resumen.agotados}</b></span>
           <span>Por acabarse <b>{resumen.bajos}</b></span>
           <span>Sin proveedor <b>{resumen.sin_proveedor}</b></span>
           <span className="mut">Mercadería en stock {peso(resumen.plata_en_stock)}</span>
@@ -145,7 +145,7 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
             )}
             {pedidos.length > 0 && <button className="sec" style={{ marginRight: 8 }} disabled={ocupado} onClick={() => guardarPedido(g.proveedor_id, pedidos, false)}>Guardar borrador</button>}
             {tel && pedidos.length > 0
-              ? <a className="btn" href={linkWhatsApp(tel, mensajePedidoProveedor(kiosco.nombre, g.nombre, pedidos))} target="_blank" rel="noopener" onClick={() => void guardarPedido(g.proveedor_id, pedidos, true)}>Pedir por WhatsApp</a>
+              ? <a className="btn principal" href={linkWhatsApp(tel, mensajePedidoProveedor(kiosco.nombre, g.nombre, pedidos))} target="_blank" rel="noopener" onClick={() => void guardarPedido(g.proveedor_id, pedidos, true)}>Pedir por WhatsApp</a>
               : <p className="mut">{tel ? "No hay cantidades para pedir." : "Este proveedor no tiene teléfono cargado. Completalo en Proveedores."}</p>}
           </section>
         );
@@ -164,6 +164,6 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
         </section>
       )}
       <PedidosProveedor kiosco={kiosco} refresco={refrescoPedidos} onComprar={onComprar} />
-    </>
+    </Pantalla>
   );
 }

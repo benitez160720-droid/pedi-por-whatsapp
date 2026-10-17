@@ -102,7 +102,7 @@ export default function CargaMasiva({ kiosco, existentes, onListo, onCerrar }: {
               <p>✔ {plan.filas.length} para cargar{plan.duplicados > 0 ? ` · ${plan.duplicados} repetidos (se omiten)` : ""}{plan.errores.length > 0 ? ` · ${plan.errores.length} con error` : ""}</p>
               {plan.filas.slice(0, 5).map((f, i) => (<div className="mut" key={i}>{f.nombre} · {f.categoria} · {peso(f.precio)}{f.stock != null ? ` · stock ${f.stock}` : ""}{f.objetivo != null ? ` · objetivo ${f.objetivo}` : ""}{f.dias != null ? ` · ${f.dias} días` : ""}{f.proveedorNombre ? ` · ${f.proveedorNombre}` : ""}</div>))}
               {plan.filas.length > 5 && <div className="mut">… y {plan.filas.length - 5} más</div>}
-              {plan.errores.slice(0, 5).map((e, i) => (<div key={i} style={{ color: "#c0392b" }}>{e.linea > 0 ? `Línea ${e.linea}: ` : ""}{e.motivo}{e.texto ? ` — ${e.texto}` : ""}</div>))}
+              {plan.errores.slice(0, 5).map((e, i) => (<div key={i} style={{ color: "var(--danger)" }}>{e.linea > 0 ? `Línea ${e.linea}: ` : ""}{e.motivo}{e.texto ? ` — ${e.texto}` : ""}</div>))}
             </>
           )}
           <button style={{ width: "100%", marginTop: 8 }} disabled={guardando || plan.filas.length === 0} onClick={() => guardar(plan.filas)}>

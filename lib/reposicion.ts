@@ -64,10 +64,10 @@ export function costoEstimado(lineas: { cantidad: number; por_peso: boolean; cos
   return { total: Math.round((total + Number.EPSILON) * 100) / 100, sinCosto };
 }
 
-export const ETIQUETA_ESTADO: Record<EstadoRepo, string> = { agotado: "Agotado", critico: "Se acaba", bajo: "Bajo" };
+export const ETIQUETA_ESTADO: Record<EstadoRepo, string> = { agotado: "Se acabó", critico: "Se acaba", bajo: "Queda poco" };
 
 export function textoDias(f: Pick<FilaReposicion, "estado" | "dias_restantes">): string {
-  if (f.estado === "agotado") return "Sin stock";
+  if (f.estado === "agotado") return "Se acabó";
   if (f.dias_restantes === null) return "Bajo el mínimo";
   const d = f.dias_restantes;
   return d < 1 ? "Menos de 1 día" : `Alcanza ${d.toLocaleString("es-AR", { maximumFractionDigits: 1 })} días`;
@@ -76,8 +76,8 @@ export function textoDias(f: Pick<FilaReposicion, "estado" | "dias_restantes">):
 // Aviso push diario (lo manda el cron). Un solo mensaje por kiosco, no uno por producto.
 export function armarAvisoStock(a: { agotados: number; bajos: number; sin_proveedor: number }) {
   const partes: string[] = [];
-  if (a.agotados > 0) partes.push(`${a.agotados} agotado${a.agotados > 1 ? "s" : ""}`);
-  if (a.bajos > 0) partes.push(`${a.bajos} por acabarse`);
+  if (a.agotados > 0) partes.push(a.agotados > 1 ? `${a.agotados} se acabaron` : `${a.agotados} se acabó`);
+  if (a.bajos > 0) partes.push(a.bajos > 1 ? `${a.bajos} quedan poco` : `${a.bajos} queda poco`);
   const sp = a.sin_proveedor > 0 ? ` · ${a.sin_proveedor} sin proveedor asignado` : "";
   return { title: "Hay que reponer mercadería", body: partes.join(" · ") + sp, url: "/panel?tab=reponer" };
 }

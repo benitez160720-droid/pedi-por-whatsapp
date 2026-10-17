@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import { linkWhatsApp, normalizarTelefonoAR } from "@/lib/whatsapp";
@@ -10,6 +11,7 @@ const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u
 const fecha = (s: string) => new Date(s).toLocaleDateString("es-AR");
 
 export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: Kiosco; campanas: Campana[]; premios: Premio[] }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [lista, setLista] = useState<Cli[]>([]);
   const [busca, setBusca] = useState("");
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
     setMsg("");
     const { error } = await supabase.rpc("fidelidad_dar_sellos", { p_cliente: c.id, p_campana: campana, p_cantidad: cant ?? null, p_motivo: motivo ?? null });
     if (error) { setMsg(mensajeFidelidad(error.message)); return false; }
-    setMsg("Sellos actualizados ✔"); await refrescar(c.id); return true;
+    setMsg("Puntos actualizados ✔"); await refrescar(c.id); return true;
   }
   async function sumarPorTelefono() {
     setMsg("");
@@ -73,10 +75,10 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
       ? { p_cliente: c!.id, p_campana: accion, p_cantidad: null, p_motivo: null }
       : { p_cliente: c!.id, p_campana: null, p_cantidad: 1, p_motivo: "Sello en mostrador" });
     if (error) return setMsg(mensajeFidelidad(error.message));
-    setTel(""); setNombre(""); setMsg("Sello sumado ✔"); void cargar();
+    setTel(""); setNombre(""); setMsg("Punto sumado ✔"); void cargar();
   }
   async function canjear(c: Cli, p: Premio) {
-    if (!window.confirm(`¿Canjear "${p.nombre}" para ${c.nombre}? Se descuentan ${p.costo_sellos} sellos.${p.tipo === "libre" ? "" : " El descuento o producto lo aplicás vos en la venta (o canjealo directo desde la Caja)."}`)) return;
+    if (!await confirmar({ titulo: `¿Canjear "${p.nombre}" para ${c.nombre}? Se descuentan ${p.costo_sellos} puntos.${p.tipo === "libre" ? "" : " El descuento o producto lo aplicás vos en la venta (o canjealo directo desde la Caja)."}`, confirmar: "Sí, seguir", peligro: false })) return;
     const { error } = await supabase.rpc("fidelidad_canjear", { p_cliente: c.id, p_premio: p.id });
     setMsg(error ? mensajeFidelidad(error.message) : "Premio canjeado ✔"); await refrescar(c.id);
   }
@@ -85,7 +87,7 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
     if (error) setMsg(mensajeFidelidad(error.message)); await refrescar(c.id);
   }
   async function anularCanje(c: Cli, m: Mov) {
-    if (!window.confirm("¿Anular este canje? Los sellos vuelven al cliente.")) return;
+    if (!await confirmar({ titulo: "¿Anular este canje? Los puntos vuelven al cliente.", confirmar: "Sí, seguir", peligro: true })) return;
     const { error } = await supabase.rpc("fidelidad_anular_canje", { p_canje: m.canje_id });
     setMsg(error ? mensajeFidelidad(error.message) : "Canje anulado ✔"); await refrescar(c.id);
   }
@@ -98,10 +100,11 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
 
   return (
     <>
+      {ventanaConfirmar}
       <div className="card">
-        <h3>Sumar sellos en el mostrador</h3>
-        <input placeholder="WhatsApp del cliente" value={tel} onChange={(e) => setTel(e.target.value)} inputMode="tel" />
-        <input placeholder="Nombre (si es nuevo)" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        <h3>Sumar puntos en el mostrador</h3>
+        <input placeholder="WhatsApp del cliente" aria-label="WhatsApp del cliente" value={tel} onChange={(e) => setTel(e.target.value)} inputMode="tel" />
+        <input placeholder="Nombre (si es nuevo)" aria-label="Nombre del cliente (si es nuevo)" value={nombre} onChange={(e) => setNombre(e.target.value)} />
         <select value={accion} onChange={(e) => setAccion(e.target.value)} aria-label="Qué sumar">
           <option value="">+1 sello</option>
           {manuales.map((m) => <option key={m.id} value={m.id}>{m.nombre} (+{m.sellos})</option>)}
@@ -110,8 +113,8 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
         <p className="mut">Las compras de pedidos y de la Caja (con cliente elegido) suman solas según tus campañas activas.</p>
       </div>
       {msg && <p role="status" className="mut">{msg}</p>}
-      <input type="search" placeholder="Buscar cliente por nombre o teléfono" value={busca} onChange={(e) => setBusca(e.target.value)} />
-      <h3>{busca ? "Resultados" : `Clientes con sellos (${visibles.length})`}</h3>
+      <input type="search" aria-label="Buscar cliente por nombre o teléfono" placeholder="Buscar cliente por nombre o teléfono" value={busca} onChange={(e) => setBusca(e.target.value)} />
+      <h3>{busca ? "Resultados" : `Clientes con puntos (${visibles.length})`}</h3>
       {visibles.length === 0 && <p className="mut">{busca ? "No encontramos ese cliente." : "Todavía nadie tiene sellos. Llegan solos con cada compra, o los sumás acá."}</p>}
       {visibles.map((c) => {
         const canjeables = activos.filter((p) => c.sellos_disponibles >= p.costo_sellos);

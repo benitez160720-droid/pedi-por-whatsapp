@@ -3,12 +3,17 @@ import { useEffect, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import { peso } from "@/lib/whatsapp";
 import ProductosModificados from "@/components/ProductosModificados";
+import Avisos from "@/components/Avisos";
 
 type R = { pedidos: number; monto_pedidos: number; fiado_pendiente: number; deudores: number; sellos_semana: number; premios_semana: number; ultimo_ajuste: string | null; productos: number };
 
-export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "precios" | "fiado" | "reponer") => void }) {
+export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "precios" | "fiado" | "reponer" | "local") => void }) {
   const [r, setR] = useState<R | null>(null);
   const [err, setErr] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  async function copiarLink() {
+    try { await navigator.clipboard.writeText(`${location.origin}/${kiosco.slug}`); setCopiado(true); setTimeout(() => setCopiado(false), 2500); } catch { setCopiado(false); }
+  }
   const [stock, setStock] = useState<{ agotados: number; bajos: number; plata: number } | null>(null);
   const [vencido, setVencido] = useState<{ clientes: number; monto: number } | null>(null);
   useEffect(() => {
@@ -27,18 +32,26 @@ export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "p
     });
   }, [kiosco.id]);
 
-  if (err) return <p role="alert" style={{ color: "#c0392b" }}>No pudimos cargar el resumen.</p>;
+  if (err) return <p role="alert" style={{ color: "var(--danger)" }}>No pudimos cargar el resumen.</p>;
   if (!r) return <p className="mut">Cargando…</p>;
   const dias = r.ultimo_ajuste ? Math.floor((Date.now() - new Date(r.ultimo_ajuste).getTime()) / 86400000) : null;
   const revisar = r.productos > 0 && (dias === null || dias >= 7);
   const Fila = ({ n, t }: { n: string | number; t: string }) => (<div className="card row"><span>{t}</span><b style={{ fontSize: 22 }}>{n}</b></div>);
   return (
     <>
+      <Avisos kiosco={kiosco} soloPendiente />
+      <div className="card row">
+        <span>Tu tienda: <b>/{kiosco.slug}</b></span>
+        <span className="acciones">
+          <button type="button" onClick={copiarLink}>{copiado ? "Link copiado ✔" : "Copiar link"}</button>
+          <button type="button" className="sec" onClick={() => onIr("local")}>Ver QR</button>
+        </span>
+      </div>
       <h2>Últimos 7 días</h2>
       <Fila n={r.pedidos} t="Pedidos recibidos" />
       <Fila n={peso(Number(r.monto_pedidos))} t="Monto pedido" />
       <Fila n={peso(Number(r.fiado_pendiente))} t={`Fiado pendiente (${r.deudores} clientes)`} />
-      <Fila n={r.sellos_semana} t="Sellos entregados" />
+      <Fila n={r.sellos_semana} t="Puntos entregados" />
       <Fila n={r.premios_semana} t="Premios canjeados" />
       {vencido && vencido.clientes > 0 && (
         <div className="card">

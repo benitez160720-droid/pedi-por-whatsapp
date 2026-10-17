@@ -28,7 +28,7 @@ export default function ResumenSellos({ kiosco }: { kiosco: Kiosco }) {
     const v = vence.trim() === "" ? null : Number(vence);
     if (v !== null && (!Number.isInteger(v) || v < 30 || v > 1095)) return setMsg("El vencimiento tiene que estar entre 30 y 1095 días (o vacío para que no venzan).");
     const { error } = await supabase.from("kioscos").update({ sellos_vencen_dias: v }).eq("id", kiosco.id);
-    setMsg(error ? "No se pudo guardar el vencimiento." : v ? `Los sellos vencen tras ${v} días sin actividad ✔` : "Los sellos no vencen ✔");
+    setMsg(error ? "No se pudo guardar el vencimiento." : v ? `Los puntos vencen tras ${v} días sin actividad ✔` : "Los puntos no vencen ✔");
   }
 
   return (
@@ -38,13 +38,13 @@ export default function ResumenSellos({ kiosco }: { kiosco: Kiosco }) {
       {r && (
         <>
           <div className="card">
-            <div className="row"><span className="mut">Sellos dados</span><b>{r.sellos_dados}</b></div>
+            <div className="row"><span className="mut">Puntos dados</span><b>{r.sellos_dados}</b></div>
             <div className="row"><span className="mut">Premios canjeados</span><b>{r.canjes}</b></div>
-            <div className="row"><span className="mut">Clientes con sellos</span><b>{r.clientes_con_saldo}</b></div>
+            <div className="row"><span className="mut">Clientes con puntos</span><b>{r.clientes_con_saldo}</b></div>
             <div className="row"><span className="mut">Sellos en circulación</span><b>{r.sellos_en_circulacion}</b></div>
           </div>
           <div className="card"><h3>Qué campañas funcionan</h3>
-            {r.por_campana.length === 0 && <p className="mut">Sin sellos en este período.</p>}
+            {r.por_campana.length === 0 && <p className="mut">Sin puntos en este período.</p>}
             {r.por_campana.map((x) => <div className="row" key={x.nombre}><span>{x.nombre}</span><b>{x.sellos}</b></div>)}
           </div>
           <div className="card"><h3>Premios más canjeados</h3>
@@ -52,14 +52,14 @@ export default function ResumenSellos({ kiosco }: { kiosco: Kiosco }) {
             {r.por_premio.map((x) => <div className="row" key={x.nombre}><span>{x.nombre}</span><b>{x.canjes}</b></div>)}
           </div>
           <div className="card"><h3>Tus mejores clientes</h3>
-            {r.top_clientes.length === 0 && <p className="mut">Nadie tiene sellos todavía.</p>}
+            {r.top_clientes.length === 0 && <p className="mut">Nadie tiene puntos todavía.</p>}
             {r.top_clientes.map((x) => <div className="row" key={x.nombre}><span>{x.nombre}</span><b>{x.sellos}</b></div>)}
           </div>
         </>
       )}
       <div className="card">
-        <h3>Vencimiento de sellos</h3>
-        <p className="mut">Si un cliente pasa tantos días sin sumar sellos, su saldo vence. Vacío = no vencen nunca. Los sellos no se borran: si se cambia o se quita el plazo, el saldo vuelve.</p>
+        <h3>Vencimiento de puntos</h3>
+        <p className="mut">Si un cliente pasa tantos días sin sumar puntos, su saldo vence. Vacío = no vencen nunca. Los puntos no se borran: si se cambia o se quita el plazo, el saldo vuelve.</p>
         <label>Días sin actividad (30 a 1095)<input inputMode="numeric" value={vence} placeholder="No vencen" onChange={(e) => setVence(e.target.value)} /></label>
         <button className="sec" onClick={guardarVencimiento}>Guardar</button>
       </div>

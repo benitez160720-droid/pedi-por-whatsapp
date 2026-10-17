@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useCallback, useEffect, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import { linkWhatsApp, normalizarTelefonoAR } from "@/lib/whatsapp";
@@ -13,6 +14,7 @@ type Prov = { id: string; nombre: string; telefono: string | null };
 // Pedidos a proveedor con estados: borrador → enviado → llegó una parte → recibido (o cancelado).
 // No mueve stock ni deuda: cuando llega la mercadería se registra la compra (acá se precarga con lo que llegó).
 export default function PedidosProveedor({ kiosco, refresco, onComprar }: { kiosco: Kiosco; refresco: number; onComprar?: (proveedorId: string, lineas: LineaCompra[]) => void }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [pedidos, setPedidos] = useState<PedidoProv[] | null>(null);
   const [provs, setProvs] = useState<Record<string, Prov>>({});
   const [msg, setMsg] = useState("");
@@ -59,7 +61,7 @@ export default function PedidosProveedor({ kiosco, refresco, onComprar }: { kios
     await cargar();
   }
 
-  if (pedidos === null) return msg ? <p role="alert" style={{ color: "#c0392b" }}>{msg}</p> : null;
+  if (pedidos === null) return msg ? <p role="alert" style={{ color: "var(--danger)" }}>{msg}</p> : null;
   if (pedidos.length === 0) return null;
   const activos = pedidos.filter((p) => p.estado === "borrador" || p.estado === "enviada" || p.estado === "recibida_parcial");
   const anteriores = pedidos.filter((p) => !activos.includes(p));
@@ -71,6 +73,7 @@ export default function PedidosProveedor({ kiosco, refresco, onComprar }: { kios
     const falta = textoFaltante(p.items);
     return (
       <div className="card" key={p.id} style={{ margin: ".4rem 0" }}>
+      {ventanaConfirmar}
         <div className="row">
           <b>#{p.numero} · {prov?.nombre ?? "Proveedor"}</b>
           <span className="mut">{ETIQUETA_PEDIDO[p.estado]} · {new Date(p.created_at).toLocaleDateString("es-AR")}</span>
@@ -106,8 +109,8 @@ export default function PedidosProveedor({ kiosco, refresco, onComprar }: { kios
           )}
           {a.enviar && <button className="sec" disabled={ocupado} onClick={() => accion("pedido_proveedor_enviar", p.id, "Pedido marcado como enviado ✔")}>Marcar como enviado</button>}
           {a.recibir && recibiendo !== p.id && <button disabled={ocupado} onClick={() => { setRecibiendo(p.id); setTextos({}); setMsg(""); }}>Registrar lo que llegó</button>}
-          {a.cerrar && <button className="sec" disabled={ocupado} onClick={() => { if (confirm("¿Dar por cerrado el pedido? Lo que no llegó ya no se espera.")) void accion("pedido_proveedor_cerrar", p.id, "Pedido cerrado ✔"); }}>Cerrar sin lo que falta</button>}
-          {a.cancelar && <button className="sec" disabled={ocupado} onClick={() => { if (confirm("¿Cancelar este pedido?")) void accion("pedido_proveedor_cancelar", p.id, "Pedido cancelado ✔"); }}>Cancelar pedido</button>}
+          {a.cerrar && <button className="sec" disabled={ocupado} onClick={async () => { if (await confirmar({ titulo: "¿Dar por cerrado el pedido? Lo que no llegó ya no se espera.", confirmar: "Sí, seguir", peligro: true })) void accion("pedido_proveedor_cerrar", p.id, "Pedido cerrado ✔"); }}>Cerrar sin lo que falta</button>}
+          {a.cancelar && <button className="sec" disabled={ocupado} onClick={async () => { if (await confirmar({ titulo: "¿Cancelar este pedido?", confirmar: "Sí, seguir", peligro: true })) void accion("pedido_proveedor_cancelar", p.id, "Pedido cancelado ✔"); }}>Cancelar pedido</button>}
         </div>
       </div>
     );

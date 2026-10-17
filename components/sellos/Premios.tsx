@@ -1,10 +1,12 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import type { ProductoSello } from "../Sellos";
 import { PREMIO_VACIO, TIPOS_PREMIO, describirPremio, formDesdePremio, mensajeFidelidad, premioDesdeForm, validarPremio, type FormPremio, type Premio } from "@/lib/fidelidad";
 
 export default function Premios({ kiosco, premios, productos, onCambio }: { kiosco: Kiosco; premios: Premio[]; productos: ProductoSello[]; onCambio: () => void }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [form, setForm] = useState<(FormPremio & { id?: string }) | null>(null);
   const [msg, setMsg] = useState(""); const [ocupado, setOcupado] = useState(false);
   const set = <K extends keyof FormPremio>(k: K, v: FormPremio[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
@@ -28,14 +30,15 @@ export default function Premios({ kiosco, premios, productos, onCambio }: { kios
     if (error) setMsg("No se pudo cambiar el estado."); else onCambio();
   }
   async function borrar(p: Premio) {
-    if (!window.confirm(`¿Borrar el premio “${p.nombre}”? Los canjes ya hechos se conservan.`)) return;
+    if (!await confirmar({ titulo: `¿Borrar el premio “${p.nombre}”? Los canjes ya hechos se conservan.`, confirmar: "Sí, seguir", peligro: true })) return;
     const { error } = await supabase.from("fidelidad_premios").delete().eq("id", p.id).eq("kiosco_id", kiosco.id);
     if (error) setMsg("No se pudo borrar."); else { setMsg("Premio borrado."); onCambio(); }
   }
 
   return (
     <>
-      <p className="mut">Podés tener varios premios con distinto costo: uno chico a los 5 sellos y uno grande a los 20. El cliente elige cuál canjear.</p>
+      {ventanaConfirmar}
+      <p className="mut">Podés tener varios premios con distinto costo: uno chico a los 5 puntos y uno grande a los 20. El cliente elige cuál canjear.</p>
       {msg && <p role="status" className="mut">{msg}</p>}
       {!form && <button onClick={() => { setMsg(""); setForm({ ...PREMIO_VACIO }); }}>Nuevo premio</button>}
       {form && (
@@ -67,7 +70,7 @@ export default function Premios({ kiosco, premios, productos, onCambio }: { kios
         </div>
       )}
       <h3>Tus premios ({premios.length})</h3>
-      {premios.length === 0 && <p className="mut">Sin premios: los clientes juntan sellos pero no tienen qué canjear. Creá uno arriba.</p>}
+      {premios.length === 0 && <p className="mut">Sin premios: los clientes juntan puntos pero no tienen qué canjear. Creá uno arriba.</p>}
       {premios.map((p) => (
         <div className="card" key={p.id} style={{ opacity: p.activo ? 1 : 0.6 }}>
           <div className="row"><b>{p.nombre}</b><span className="mut">{p.activo ? "" : "pausado"}</span></div>

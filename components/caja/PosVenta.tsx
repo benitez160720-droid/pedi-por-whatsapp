@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import FidelidadCaja from "./FidelidadCaja";
@@ -25,7 +26,7 @@ export type Destino = "movimientos" | "cierre" | "z";
 const AYUDA: [string, string][] = [
   ["F1 / 1", "Ayuda: este listado"], ["F2 / 2", "Cobrar"], ["F3 / 3", "Descuento global"], ["F4 / 4", "Nueva venta (vaciar)"],
   ["F5 / 5", "Buscar producto"], ["F6 / 6", "Elegir cliente"], ["F7 / 7", "Movimiento de caja"], ["F8 / 8", "Cerrar caja"],
-  ["F9 / 9", "Reporte Z"], ["F10 / 0", "Escanear con la cámara"], ["Lector USB", "Escaneá en cualquier momento: suma el producto solo"], ["+ / −", "Cantidad del último ítem"], ["Supr", "Quitar último ítem"],
+  ["F9 / 9", "Resumen de la caja"], ["F10 / 0", "Escanear con la cámara"], ["Lector USB", "Escaneá en cualquier momento: suma el producto solo"], ["+ / −", "Cantidad del último ítem"], ["Supr", "Quitar último ítem"],
   ["Enter", "Cobrar / confirmar"], ["Esc", "Cerrar"],
 ];
 const enCampoDeTexto = () => { const a = document.activeElement as HTMLElement | null; return !!a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT" || a.isContentEditable); };
@@ -151,12 +152,13 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
     setAvisoFid(""); setPremio(p); sonar("ok");
   };
 
-  const vaciar = useCallback(() => {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
+  const vaciar = useCallback(async () => {
     if (!lineas.length && !cliente && !descPct) return;
-    if (lineas.length && !window.confirm("¿Vaciar todo el carrito?")) return;
+    if (lineas.length && !(await confirmar({ titulo: "¿Vaciar el carrito?", detalle: "Se borran los productos cargados en esta venta.", confirmar: "Sí, vaciar", peligro: true }))) return;
     setLineas([]); setDescPct(""); setCliente(null); setMsg("");
     inputProd.current?.focus();
-  }, [lineas.length, cliente, descPct]);
+  }, [lineas.length, cliente, descPct, confirmar]);
 
   const ponerEnEspera = () => {
     if (!lineas.length) return;
@@ -219,7 +221,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
       const vuelto = Math.max(0, Math.round((pagos.reduce((a, p) => a + p.monto, 0) - tot.total) * 100) / 100);
       const t = armarTicket(0, { subtotal: tot.subtotal, descuento: tot.descuento, total: tot.total, vuelto: efectivo > 0 ? vuelto : 0 }, pagos, true);
       setTicket(t); void salidaVenta(t, pagos);
-      if (premioVenta) setAvisoFid(`⚠ La venta quedó pendiente de sincronizar: canjeá "${premioVenta.nombre}" desde Sellos cuando vuelva internet.`);
+      if (premioVenta) setAvisoFid(`⚠ La venta quedó pendiente de sincronizar: canjeá "${premioVenta.nombre}" desde Puntos y premios cuando vuelva internet.`);
       refrescarCola(); terminarVenta();
     };
     if (!navigator.onLine) { guardarSinConexion(); return null; }
@@ -369,6 +371,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
 
   return (
     <div className="pos-venta">
+      {ventanaConfirmar}
       <div className="pos-izq card">
         <div className="pos-buscador">
           <div className="pos-busqueda-wrap">
