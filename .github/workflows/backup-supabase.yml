@@ -22,6 +22,9 @@ jobs:
         env: { DB_URL: "${{ secrets.SUPABASE_DB_URL }}" }
         run: |
           set -e
+          # El cliente 17 queda en /usr/lib/postgresql/17/bin; el pg_dump por defecto es 16 y Supabase usa 17.
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          pg_dump --version
           pg_dump "$DB_URL" --no-owner --no-privileges --schema=public --format=custom --file=backup.dump
           pg_restore --list backup.dump > /dev/null   # valida que el archivo se pueda leer
           ls -lh backup.dump
