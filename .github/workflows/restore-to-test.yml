@@ -1,7 +1,7 @@
 name: Restore a proyecto de prueba
 # Prueba que el último backup se pueda restaurar. Solo manual (workflow_dispatch).
 # Requiere SUPABASE_TEST_DB_URL: Session pooler de un proyecto de PRUEBA, nunca el de producción.
-# La restauración usa --clean: borra y recrea el esquema public del destino de prueba.
+# Antes de restaurar borra y recrea el esquema public del destino de prueba (nunca producción).
 on:
   workflow_dispatch:
 permissions:
@@ -44,7 +44,10 @@ jobs:
         run: |
           set -e
           export PATH="/usr/lib/postgresql/17/bin:$PATH"
-          pg_restore --no-owner --no-privileges --clean --if-exists --exit-on-error --dbname "$TEST_URL" backup.dump
+          # Recrea public vacío (solo en el destino de prueba) y restaura sin --clean: en una base vacía
+          # --clean intenta DROP POLICY sobre tablas que todavía no existen.
+          psql "$TEST_URL" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade; create schema public;"
+          pg_restore --no-owner --no-privileges --exit-on-error --dbname "$TEST_URL" backup.dump
           echo "Restauración terminada."
       - name: Comparar tablas y conteos con producción
         env:
