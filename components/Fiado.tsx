@@ -47,6 +47,15 @@ export default function Fiado({ kiosco }: { kiosco: Kiosco }) {
     setNNombre(""); setNTel(""); setSoloDeuda(false); setMsg("Cliente creado ✔"); cargar();
   }
 
+  async function borrar(c: Cli) {
+    const aviso = `¿Borrar a ${c.nombre} de la libreta? Se pierden su fiado, sus sellos y su historial. Los pedidos se conservan.`;
+    if (!window.confirm(aviso)) return;
+    const { error } = await supabase.rpc("borrar_cliente", { p_cliente: c.id });
+    if (error) { setMsg("No se pudo borrar el cliente."); return; }
+    setAbierto(null); setMsg("Cliente borrado ✔");
+    await cargar();
+  }
+
   const deuda = lista.filter((c) => c.saldo > 0).reduce((s, c) => s + c.saldo, 0);
   const visibles = soloDeuda ? lista.filter((c) => c.saldo > 0) : lista;
   return (
@@ -72,6 +81,7 @@ export default function Fiado({ kiosco }: { kiosco: Kiosco }) {
               <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
                 <button onClick={() => registrar(c, "fiado")}>Se llevó fiado</button>
                 <button className="sec" onClick={() => registrar(c, "pago")}>Pagó</button>
+                <button className="sec" onClick={() => borrar(c)} style={{ color: "#c0392b" }}>Borrar cliente</button>
                 {c.saldo > 0 && (
                   <a className="btn sec" href={linkWhatsApp(normalizarTelefonoAR(c.telefono),
                     `Hola ${c.nombre}! Te escribimos de ${kiosco.nombre}. Te recordamos que tenés un saldo pendiente de ${peso(c.saldo)}. Cuando puedas pasá a saldarlo. ¡Gracias!`)}>Recordar</a>
