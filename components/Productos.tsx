@@ -34,7 +34,7 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   const [soloSinStock, setSoloSinStock] = useState(false);
   const [limite, setLimite] = useState(PAGINA);
   const [editId, setEditId] = useState<string | null>(null);
-  const [ed, setEd] = useState({ nombre: "", cat: "", precio: "" });
+  const [ed, setEd] = useState({ nombre: "", cat: "", precio: "", controla: false, stock: "" });
   const refNombre = useRef<HTMLInputElement>(null);
   const refPrecio = useRef<HTMLInputElement>(null);
 
@@ -120,11 +120,13 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
       if (error) setAviso("No se pudo cambiar el precio."); else cargar();
     }
   }
-  function abrirEdicion(p: Producto) { setEditId(editId === p.id ? null : p.id); setEd({ nombre: p.nombre, cat: p.categoria, precio: String(p.precio) }); }
+  function abrirEdicion(p: Producto) { setEditId(editId === p.id ? null : p.id); setEd({ nombre: p.nombre, cat: p.categoria, precio: String(p.precio), controla: !!p.stock_controlado, stock: String(p.stock ?? 0) }); }
   async function guardarEdicion(p: Producto) {
     const n = capitalizar(ed.nombre); const pr = num(ed.precio);
     if (n.length < 2 || isNaN(pr) || pr < 0) { setAviso("Revisá el nombre y el precio."); return; }
-    const { error } = await supabase.from("productos").update({ nombre: n, categoria: capitalizar(ed.cat) || "General", precio: pr }).eq("id", p.id);
+    const st = Math.floor(num(ed.stock));
+    if (ed.controla && (isNaN(st) || st < 0)) { setAviso("El stock tiene que ser un número igual o mayor a cero."); return; }
+    const { error } = await supabase.from("productos").update({ nombre: n, categoria: capitalizar(ed.cat) || "General", precio: pr, stock_controlado: ed.controla, ...(ed.controla ? { stock: st, disponible: st > 0 ? true : p.disponible } : {}) }).eq("id", p.id);
     if (error) { setAviso("No se pudo guardar el cambio."); return; }
     setEditId(null); setAviso(`Actualizado ✔ ${n}`); cargar();
   }
@@ -202,7 +204,7 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
           <div className="row">
             <div onClick={() => abrirEdicion(p)} style={{ cursor: "pointer", minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
               {p.imagen_url && <img src={p.imagen_url} alt="" width={44} height={44} loading="lazy" style={{ objectFit: "cover", borderRadius: 8, flex: "none", background: "var(--bd)" }} />}
-              <div style={{ minWidth: 0 }}><div>{p.nombre} <span className="mut">✎</span></div><span className="mut">{p.categoria}</span></div>
+              <div style={{ minWidth: 0 }}><div>{p.nombre} <span className="mut">✎</span></div><span className="mut">{p.categoria}{p.stock_controlado ? ` · quedan ${p.stock ?? 0}` : ""}</span></div>
             </div>
             <div className="qty">
               <button className="sec" onClick={() => cambiarPrecio(p)}>{peso(Number(p.precio))}</button>
@@ -215,6 +217,10 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
               <input value={ed.cat} onChange={(e) => setEd({ ...ed, cat: e.target.value })} placeholder="Categoría" list="cats-edit" />
               <datalist id="cats-edit">{categorias.map((c) => <option key={c} value={c} />)}</datalist>
               <input value={ed.precio} onChange={(e) => setEd({ ...ed, precio: e.target.value })} placeholder="Precio" inputMode="decimal" />
+              <label className="mut" style={{ display: "block", margin: "8px 0" }}>
+                <input type="checkbox" checked={ed.controla} onChange={(e) => setEd({ ...ed, controla: e.target.checked })} style={{ width: "auto", marginRight: 8 }} />Controlar stock por cantidad
+              </label>
+              {ed.controla && <input value={ed.stock} onChange={(e) => setEd({ ...ed, stock: e.target.value })} placeholder="Cantidad disponible" inputMode="numeric" />}
               <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", margin: "0 0 10px" }}>
                 <label className="btn sec" aria-busy={subiendo === p.id}>
                   {subiendo === p.id ? "Subiendo…" : p.imagen_url ? "📷 Cambiar foto" : "📷 Agregar foto"}

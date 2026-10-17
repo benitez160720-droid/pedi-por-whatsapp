@@ -1,24 +1,444 @@
-:root { --bg:#fafaf7; --fg:#1b1b18; --mut:#6b6b64; --acc:#128c4a; --card:#fff; --bd:#e4e4dc; }
-@media (prefers-color-scheme: dark) { :root { --bg:#141412; --fg:#f1f1ea; --mut:#a2a299; --acc:#2bc46f; --card:#1d1d1a; --bd:#2f2f2a; } }
+/* ==========================================================================
+   Pedí por WhatsApp — sistema visual "Mercado Vivo"
+   Lenguaje tomado del portal cliente de distrib (concepto "Mercado Vivo"):
+   puesto de mercado / feria de almacén, no plantilla SaaS.
+   - Franja de marca oscura con filo de arcilla.
+   - Titular tipo afiche (Fraunces itálica).
+   - Tarjetas "ticket" con esquina cortada y sombra dura (sin blur).
+   - Pestañas con subrayado, no chips rellenos.
+   - Renglones de recibo con borde punteado.
+   - Fondo de puntos sobre papel cálido.
+   Solo presentación: no cambia IDs, clases que leen los componentes
+   (.card, .row, .mut, .sec, .btn, .qty, .bar, .chips, .tabs, .sticky)
+   ni la lógica de ninguna pantalla.
+   ========================================================================== */
+
+:root {
+  --ink:        #16211c;
+  --muted:      #56635b;   /* AA sobre --paper (≈5.9:1) */
+  --paper:      #f6f3ec;
+  --paper-2:    #efe9db;
+  --line:       #ddd6c4;
+  --line-soft:  #e8e2d2;
+  --surface:    #ffffff;
+
+  --deep:       #16302a;   /* verde profundo: marca, botón principal */
+  --deep-2:     #0e211c;
+  --accent:     #86b792;   /* verde salvia: punto en vivo, detalles */
+  --clay:       #c1552c;   /* arcilla: acción, foco, oferta */
+  --clay-dark:  #9c4522;
+  --gold:       #d99a3d;
+
+  --ok:         #2f6b45;
+  --ok-bg:      #e3efe6;
+  --warn:       #8a5a12;
+  --warn-bg:    #f7e7c6;
+  --danger:     #a32d1d;
+  --danger-bg:  #f6dcd5;
+
+  --f-display: var(--font-display, "Fraunces"), Georgia, "Times New Roman", serif;
+  --f-ui:      var(--font-ui, "IBM Plex Sans"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:    var(--font-mono, "IBM Plex Mono"), ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  --ease: cubic-bezier(.2,.7,.2,1);
+  --gutter: max(1rem, calc((100vw - 1080px) / 2 + 1rem));
+  --sh-card: 3px 3px 0 rgba(22,33,28,.10);
+  --sh-lift: 5px 6px 0 rgba(22,33,28,.16);
+}
+
 * { box-sizing: border-box; }
-body { margin:0; background:var(--bg); color:var(--fg); font:18px/1.4 system-ui, sans-serif; }
-main { max-width:640px; margin:0 auto; padding:16px 16px 120px; }
-h1 { font-size:26px; margin:8px 0; } h2 { font-size:20px; margin:20px 0 8px; }
-.card { background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:12px; margin:8px 0; }
-.row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.mut { color:var(--mut); font-size:15px; }
-button, .btn { background:var(--acc); color:#fff; border:0; border-radius:10px; padding:12px 16px; font-size:18px; cursor:pointer; text-decoration:none; display:inline-block; }
-button.sec, .btn.sec { background:transparent; color:var(--fg); border:1px solid var(--bd); }
-button:disabled { opacity:.5; }
-input, select, textarea { width:100%; padding:12px; font-size:18px; border-radius:10px; border:1px solid var(--bd); background:var(--card); color:var(--fg); margin:4px 0 10px; }
-.qty { display:flex; align-items:center; gap:10px; } .qty button { padding:6px 14px; }
-.bar { position:fixed; left:0; right:0; bottom:0; padding:12px 16px; background:var(--bg); border-top:1px solid var(--bd); }
-.bar > div { max-width:640px; margin:0 auto; }
-.tag { font-size:13px; padding:2px 8px; border-radius:99px; border:1px solid var(--bd); }
-.tabs { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; } .tabs button { padding:8px 12px; font-size:16px; }
-.chips { display:flex; gap:6px; overflow-x:auto; padding:4px 0 8px; -webkit-overflow-scrolling:touch; }
-.chips button { white-space:nowrap; padding:6px 12px; font-size:15px; flex:none; }
-.sticky { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:8px; }
-.ok { color:var(--acc); }
-a { color:var(--acc); }
-a.btn { color:#fff; } a.btn.sec { color:var(--fg); }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle, rgba(22,33,28,.07) 1px, transparent 1.3px) 0 0 / 16px 16px,
+    var(--paper);
+  font: 400 1.0625rem/1.5 var(--f-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: var(--accent); color: var(--deep-2); }
+
+:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; border-radius: 4px; }
+
+/* ----------------------------- Estructura ----------------------------- */
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 1rem 7.5rem;
+}
+
+/* Franja de marca: se ve en todas las pantallas (la pone layout.tsx) */
+.franja {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  min-height: 42px;
+  padding: .55rem var(--gutter);
+  color: rgba(246,243,236,.74);
+  background: var(--deep);
+  border-bottom: 3px solid var(--clay);
+  font: 600 .66rem/1 var(--f-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.franja a { color: var(--paper); text-decoration: none; }
+.franja-marca { color: var(--paper); }
+.franja-marca i { color: var(--clay); font-style: normal; }
+.franja-punto {
+  width: 6px; height: 6px; margin-left: auto; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(134,183,146,.25);
+  animation: latido 2.4s ease-in-out infinite;
+}
+@keyframes latido { 0%,100% { opacity: .5; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
+
+/* Titular tipo afiche: se usa en la portada de la tienda y del panel */
+.afiche {
+  position: relative;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 1.6rem var(--gutter) 1.35rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.afiche::before {
+  content: "";
+  position: absolute; top: -40%; right: -6%;
+  width: 260px; height: 260px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(193,85,44,.10), transparent 70%);
+  pointer-events: none;
+}
+.afiche > * { position: relative; }
+.afiche p { margin: .45rem 0 0; max-width: 34ch; color: var(--muted); font-size: .9rem; }
+
+/* ------------------------------ Tipografía ----------------------------- */
+
+h1, h2, h3 { font-family: var(--f-display); font-weight: 600; color: var(--ink); line-height: 1.02; letter-spacing: -.01em; }
+h1 { font-style: italic; font-size: clamp(2.1rem, 6vw, 3.25rem); margin: 1.2rem 0 .5rem; }
+h2 { font-size: 1.45rem; margin: 1.6rem 0 .6rem; padding-bottom: .4rem; border-bottom: 1.5px solid var(--ink); }
+h3 { font-size: 1.15rem; margin: 1rem 0 .4rem; }
+p { margin: .5rem 0; }
+b { font-weight: 700; }
+small { font-size: .85rem; }
+
+.punto { color: var(--clay); font-style: normal; }
+
+.mut { color: var(--muted); font-size: .92rem; }
+.ok { color: var(--ok); font-weight: 600; }
+.alerta {
+  margin: .75rem 0; padding: .7rem .9rem;
+  color: var(--danger); background: var(--danger-bg);
+  border-left: 4px solid var(--clay); border-radius: 4px;
+  font-size: .95rem;
+}
+
+a { color: var(--clay-dark); text-underline-offset: 3px; }
+a:hover { color: var(--clay); }
+
+/* Etiqueta de dato (estado, medio de pago, etc.): sello de mostrador */
+.tag {
+  display: inline-block;
+  padding: .2rem .5rem;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  font: 600 .68rem/1.2 var(--f-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+/* ------------------------------- Botones ------------------------------- */
+
+button, .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-height: 46px;
+  padding: .7rem 1.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--deep);
+  color: var(--paper);
+  font: 600 1rem/1 var(--f-ui);
+  letter-spacing: .01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .18s var(--ease), color .18s var(--ease), transform .12s var(--ease), box-shadow .18s var(--ease);
+  box-shadow: 2px 2px 0 rgba(22,33,28,.14);
+}
+button:hover, .btn:hover { background: var(--clay); color: #fff; transform: translate(-1px,-1px); box-shadow: 3px 3px 0 rgba(22,33,28,.18); }
+button:active, .btn:active { transform: translate(0,0); box-shadow: 1px 1px 0 rgba(22,33,28,.14); }
+button:disabled { opacity: .42; cursor: not-allowed; transform: none; box-shadow: none; background: var(--deep); }
+a.btn { color: var(--paper); }
+a.btn:hover { color: #fff; }
+
+button.sec, .btn.sec {
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  box-shadow: none;
+}
+button.sec:hover, .btn.sec:hover { background: var(--ink); color: var(--paper); }
+button.sec:disabled { background: transparent; }
+
+/* Botón de cantidad: círculo de mostrador */
+.qty { display: flex; align-items: center; gap: .5rem; }
+.qty span {
+  min-width: 2ch; text-align: center;
+  font: 700 1rem var(--f-mono);
+}
+.qty button, .qty button.sec {
+  width: 38px; height: 38px; min-height: 38px;
+  padding: 0; border-radius: 50%;
+  font-size: 1.25rem; line-height: 1;
+}
+.qty button.sec { border-width: 1.5px; }
+
+/* ------------------------------- Formularios --------------------------- */
+
+label {
+  display: block;
+  margin: .95rem 0 .2rem;
+  font: 600 .72rem/1.3 var(--f-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+input, select, textarea {
+  display: block;
+  width: 100%;
+  margin: .35rem 0 .3rem;
+  padding: .8rem .95rem;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 1rem/1.4 var(--f-ui);
+  text-transform: none;
+  letter-spacing: normal;
+  transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+input::placeholder, textarea::placeholder { color: #8a948d; }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--clay);
+  box-shadow: 0 0 0 4px rgba(193,85,44,.16);
+}
+select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 55%, calc(100% - 14px) 55%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 2.2rem;
+}
+
+/* Buscador: píldora con sombra dura, como una etiqueta de búsqueda */
+input[type="search"] {
+  min-height: 52px;
+  padding-left: 1.15rem;
+  border-width: 2px;
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 rgba(22,33,28,.08);
+}
+input[type="search"]:focus { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 rgba(193,85,44,.16); }
+
+/* --------------------- Superficies: cards y recibos -------------------- */
+
+.card {
+  position: relative;
+  margin: .75rem 0;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--sh-card);
+}
+
+.row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.card.row { flex-wrap: wrap; }
+
+/* Renglón de recibo: línea punteada entre ítems */
+.recibo { margin: .4rem 0; }
+.recibo .row { padding: .55rem 0; border-bottom: 1.5px dashed var(--line); }
+.recibo .row:last-child { border-bottom: 0; }
+
+/* Total: display serif grande, separado por línea punteada */
+.total {
+  margin: 1rem 0 .4rem;
+  padding-top: .9rem;
+  border-top: 2px dashed var(--ink);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: 1.9rem;
+  font-weight: 600;
+}
+.total b { font-family: var(--f-mono); font-style: normal; font-size: 1.35rem; }
+
+/* Pestañas (filtros del panel y categorías): subrayado que se despliega */
+.tabs, .chips {
+  display: flex;
+  gap: 1.35rem;
+  margin: 1rem 0 .25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--line);
+}
+.tabs::-webkit-scrollbar, .chips::-webkit-scrollbar { display: none; }
+
+.tabs button, .chips button {
+  position: relative;
+  flex: none;
+  min-height: 44px;
+  padding: .25rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  font: 700 .78rem/1 var(--f-ui);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  transform: none;
+}
+.tabs button::after, .chips button::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 3px; border-radius: 3px 3px 0 0;
+  background: var(--clay);
+  transform: scaleX(0);
+  transition: transform .22s var(--ease);
+}
+.tabs button:hover, .chips button:hover { background: transparent; color: var(--ink); transform: none; box-shadow: none; }
+.tabs button:not(.sec), .chips button:not(.sec) { color: var(--ink); background: transparent; }
+.tabs button:not(.sec)::after, .chips button:not(.sec)::after { transform: scaleX(1); }
+
+/* Barra pegajosa: búsqueda y categorías que quedan arriba al bajar */
+.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: .6rem var(--gutter) 0;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.sticky .chips { border-bottom: 0; margin-top: .25rem; }
+
+/* Barra inferior de pedido: franja oscura con CTA en arcilla */
+.bar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px));
+  background: var(--ink);
+  border-top: 3px solid var(--clay);
+  box-shadow: 0 -6px 18px rgba(22,33,28,.12);
+}
+.bar > div { max-width: 1080px; margin: 0 auto; }
+.bar button { background: var(--clay); color: #fff; box-shadow: none; }
+.bar button:hover { background: var(--clay-dark); transform: none; box-shadow: none; }
+.bar button:disabled { background: #5a4a40; }
+
+/* ---------------------- Catálogo: grilla de tarjetas --------------------- */
+
+.grid-productos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.2rem .8rem;
+  margin-top: .9rem;
+}
+@media (min-width: 640px) { .grid-productos { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.6rem 1.05rem; } }
+@media (min-width: 900px) { .grid-productos { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.9rem 1.2rem; } }
+
+/* Wrapper con la sombra; el hijo recorta la esquina (si no, el clip se come la sombra) */
+.producto { filter: drop-shadow(3px 3px 0 rgba(22,33,28,.10)); min-width: 0; }
+.producto:hover { filter: drop-shadow(5px 6px 0 rgba(22,33,28,.16)); }
+
+.card-producto {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  height: 100%;
+  margin: 0;
+  padding: .6rem .6rem .7rem;
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  transition: transform .18s var(--ease);
+}
+.producto:hover .card-producto { transform: translate(-2px,-2px); }
+
+.producto-img {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--paper-2);
+  border: 1px solid var(--line-soft);
+}
+.producto-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.producto-img .inicial {
+  font: italic 600 2.4rem/1 var(--f-display);
+  color: var(--accent);
+}
+
+.producto-nombre { font-weight: 600; font-size: .95rem; line-height: 1.25; overflow-wrap: anywhere; }
+.producto-precio { font: 700 1.05rem/1 var(--f-mono); color: var(--ink); letter-spacing: -.01em; }
+.producto-pie { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+
+/* Estado de tienda: tarjeta-aviso con esquina cortada */
+.aviso-tienda {
+  padding: .9rem 1rem;
+  background: var(--paper-2);
+  border: 1.5px dashed var(--ink);
+  border-radius: 4px;
+}
+
+/* ----------------------------- Accesibilidad ---------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* ------------------------------ Pie ----------------------------------- */
+
+.pie {
+  margin-top: 2.5rem;
+  padding-top: .9rem;
+  border-top: 1.5px dashed var(--line);
+  font: 500 .72rem/1.6 var(--f-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex; flex-wrap: wrap; gap: .4rem 1rem;
+}
+.pie a { color: var(--muted); }
+
+@media (min-width: 900px) {
+  h1 { margin-top: 1.6rem; }
+}
+
+/* Utilidades usadas por los componentes */
+button.ancho { width: 100%; }
+.linea-nombre { min-width: 0; overflow-wrap: anywhere; }
+
+/* Línea diagonal de la esquina cortada: el clip-path recorta el borde justo ahí */
+.card-producto::after {
+  content: "";
+  position: absolute; top: 0; right: 0;
+  width: 17px; height: 17px;
+  background: linear-gradient(to top right, transparent calc(50% - 1.2px), var(--ink) calc(50% - 1.2px), var(--ink) calc(50% + 1.2px), transparent calc(50% + 1.2px));
+  pointer-events: none;
+}

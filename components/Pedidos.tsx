@@ -97,7 +97,7 @@ export default function Pedidos({ kiosco }: { kiosco: Kiosco }) {
 
   async function estado(id: string, e: Pedido["estado"]) {
     const { error: err } = await supabase.from("pedidos").update({ estado: e }).eq("id", id);
-    if (err) setError("No se pudo cambiar el estado."); else cargar();
+    if (err) setError(err.message?.includes("sin_stock") ? "No hay stock suficiente para confirmar este pedido. Revisá las cantidades en Productos." : "No se pudo cambiar el estado."); else cargar();
   }
 
   // Un toque: deja el pedido entregado (suma el sello) y anota el total en la libreta del cliente.

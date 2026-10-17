@@ -10,6 +10,8 @@ import Pedidos from "@/components/Pedidos";
 import Fiado from "@/components/Fiado";
 import Sellos from "@/components/Sellos";
 import Precios from "@/components/Precios";
+import Avisos from "@/components/Avisos";
+import Caja from "@/components/Caja";
 import Resumen from "@/components/Resumen";
 import QrKiosco from "@/components/QrKiosco";
 import MiKiosco from "@/components/MiKiosco";
@@ -67,8 +69,8 @@ function CrearKiosco({ userId, onListo }: { userId: string; onListo: () => void 
   );
 }
 
-type Tab = "pedidos" | "productos" | "fiado" | "sellos" | "precios" | "resumen" | "local";
-const TABS: [Tab, string][] = [["pedidos", "Pedidos"], ["productos", "Productos"], ["fiado", "Fiado"], ["sellos", "Sellos"], ["precios", "Precios"], ["resumen", "Resumen"], ["local", "Mi local"]];
+type Tab = "pedidos" | "productos" | "fiado" | "caja" | "sellos" | "precios" | "resumen" | "local";
+const TABS: [Tab, string][] = [["pedidos", "Pedidos"], ["productos", "Productos"], ["fiado", "Fiado"], ["caja", "Caja"], ["sellos", "Sellos"], ["precios", "Precios"], ["resumen", "Resumen"], ["local", "Mi local"]];
 
 function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
   const [tab, setTab] = useState<Tab>("pedidos");
@@ -87,6 +89,7 @@ function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
           {kiosco.horario_auto ? (kiosco.abierto ? "Pausar" : "Reanudar") : kiosco.abierto ? "Cerrar" : "Abrir"}
         </button>
       </div>
+      <Avisos kiosco={kiosco} />
       <QrKiosco slug={kiosco.slug} nombre={kiosco.nombre} />
       <div className="tabs">
         {TABS.map(([k, label]) => (<button key={k} className={tab === k ? "" : "sec"} onClick={() => setTab(k)}>{label}</button>))}
@@ -94,6 +97,7 @@ function Dueno({ kiosco, recargar }: { kiosco: Kiosco; recargar: () => void }) {
       {tab === "pedidos" && <Pedidos kiosco={kiosco} />}
       {tab === "productos" && <Productos kiosco={kiosco} />}
       {tab === "fiado" && <Fiado kiosco={kiosco} />}
+      {tab === "caja" && <Caja kiosco={kiosco} />}
       {tab === "sellos" && <Sellos kiosco={kiosco} />}
       {tab === "precios" && <Precios kiosco={kiosco} />}
       {tab === "resumen" && <Resumen kiosco={kiosco} onIr={setTab} />}

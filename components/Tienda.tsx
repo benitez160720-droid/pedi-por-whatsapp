@@ -7,6 +7,7 @@ import { ETIQUETA_PAGO, linkWhatsApp, mensajePedido, normalizarTelefonoAR, peso 
 
 const ERRORES: [string, string][] = [
   ["producto_no_disponible", "Algún producto ya no está disponible. Actualizá la página y armá el pedido de nuevo."],
+  ["sin_stock", "Se acabó alguno de los productos del pedido. Revisá el carrito y armalo de nuevo."],
   ["envio_invalido", "Este local no hace envíos, o falta la dirección."],
   ["telefono_invalido", "Revisá el número de WhatsApp."],
   ["nombre_invalido", "Poné tu nombre."],
@@ -115,9 +116,10 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
       <>
         <button className="sec" onClick={() => setPaso("catalogo")}>← Seguir agregando</button>
         <h1>Tu pedido</h1>
+        <div className="recibo">
         {items.map(({ p, cant }) => (
-          <div className="row" key={p.id} style={{ margin: "6px 0" }}>
-            <span style={{ minWidth: 0 }}>{p.nombre}<br /><b>{peso(Number(p.precio) * cant)}</b></span>
+          <div className="row" key={p.id}>
+            <span className="linea-nombre">{p.nombre}<br /><b>{peso(Number(p.precio) * cant)}</b></span>
             <div className="qty">
               <button className="sec" onClick={() => cambiar(p.id, -1)} aria-label={`Quitar uno de ${p.nombre}`}>−</button>
               <span>{cant}</span>
@@ -126,8 +128,9 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
           </div>
         ))}
         {envio > 0 && <div className="row mut"><span>Envío</span><span>{peso(envio)}</span></div>}
-        <h2>Total {peso(total + envio)}</h2>
-        {bajoMinimo && <p role="alert" style={{ color: "#c0392b" }}>El pedido mínimo es {peso(minimo)}. Te faltan {peso(minimo - total)}.</p>}
+        </div>
+        <div className="total"><span>Total</span><b>{peso(total + envio)}</b></div>
+        {bajoMinimo && <p role="alert" className="alerta">El pedido mínimo es {peso(minimo)}. Te faltan {peso(minimo - total)}.</p>}
         <label>Nombre<input value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="name" /></label>
         <label>Tu WhatsApp<input value={tel} onChange={(e) => setTel(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="Con código de área, sin 0 ni 15" /></label>
         <label>¿Cómo lo querés?
@@ -146,8 +149,8 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
           </label>
         )}
         <label>Nota (opcional)<textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} /></label>
-        {error && <p role="alert" style={{ color: "#c0392b" }}>{error}</p>}
-        <button style={{ width: "100%" }} disabled={!ok || enviando} onClick={enviar}>{enviando ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>
+        {error && <p role="alert" className="alerta">{error}</p>}
+        <button className="ancho" disabled={!ok || enviando} onClick={enviar}>{enviando ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>
         <p className="mut">Usamos tu nombre y teléfono solo para gestionar este pedido con {kiosco.nombre}. <Link href="/privacidad">Política de privacidad</Link>.</p>
         <button className="sec" onClick={() => { if (confirm("¿Vaciar el pedido?")) { setCart({}); setPaso("catalogo"); } }}>Vaciar pedido</button>
       </>
@@ -156,15 +159,17 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
 
   return (
     <>
-      <h1>{kiosco.nombre}</h1>
-      {kiosco.direccion && <p className="mut">{kiosco.direccion}</p>}
-      {horarioTexto && <p className="mut">Horario: {horarioTexto}</p>}
-      {cerrado && <div className="card" role="status"><b>{estado === "fuera_de_horario" ? "Fuera de horario" : "Cerrado por ahora"}</b>{proxima && <span> · {proxima}</span>}<p className="mut" style={{ margin: "4px 0 0" }}>Podés mirar los precios, pero no se reciben pedidos hasta que abra.</p></div>}
+      <header className="afiche">
+        <h1>{kiosco.nombre}<span className="punto">.</span></h1>
+        {kiosco.direccion && <p>{kiosco.direccion}</p>}
+        {horarioTexto && <p><span className="tag">Horario · {horarioTexto}</span></p>}
+      </header>
+      {cerrado && <div className="aviso-tienda" role="status"><b>{estado === "fuera_de_horario" ? "Fuera de horario" : "Cerrado por ahora"}</b>{proxima && <span> · {proxima}</span>}<p className="mut">Podés mirar los precios, pero no se reciben pedidos hasta que abra.</p></div>}
       {!cerrado && minimo > 0 && <p className="mut">Pedido mínimo: {peso(minimo)}</p>}
       {productos.length === 0 && <p className="mut">Este kiosco todavía no cargó productos.</p>}
       {productos.length > 0 && (
         <div className="sticky">
-          <input type="search" placeholder="Buscar producto" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 4 }} />
+          <input type="search" placeholder="Buscar producto" value={q} onChange={(e) => setQ(e.target.value)} />
           {categorias.length > 1 && (
             <div className="chips">
               {["Todas", ...categorias].map((c) => (<button key={c} className={c === catSel ? "" : "sec"} onClick={() => setCatSel(c)}>{c}</button>))}
@@ -176,23 +181,30 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
       {porCategoria.map(([cat, ps]) => (
         <section key={cat}>
           <h2>{cat}</h2>
+          <div className="grid-productos">
           {ps.map((p) => (
-            <div className="card row" key={p.id}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                {p.imagen_url && <img src={p.imagen_url} alt="" width={56} height={56} loading="lazy" style={{ objectFit: "cover", borderRadius: 8, flex: "none", background: "var(--bd)" }} />}
-                <div style={{ minWidth: 0 }}><div>{p.nombre}</div><b>{peso(Number(p.precio))}</b></div>
-              </div>
-              <div className="qty">
-                {cart[p.id] ? (<><button className="sec" onClick={() => cambiar(p.id, -1)} aria-label="Quitar uno">−</button><span>{cart[p.id]}</span></>) : null}
-                <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.nombre}`}>+</button>
-              </div>
+            <div className="producto" key={p.id}>
+              <article className="card-producto">
+                <div className="producto-img">
+                  {p.imagen_url ? <img src={p.imagen_url} alt="" loading="lazy" /> : <span className="inicial" aria-hidden="true">{p.nombre.charAt(0).toUpperCase()}</span>}
+                </div>
+                <div className="producto-nombre">{p.nombre}</div>
+                <div className="producto-pie">
+                  <span className="producto-precio">{peso(Number(p.precio))}</span>
+                  <div className="qty">
+                    {cart[p.id] ? (<><button className="sec" onClick={() => cambiar(p.id, -1)} aria-label="Quitar uno">−</button><span>{cart[p.id]}</span></>) : null}
+                    <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.nombre}`}>+</button>
+                  </div>
+                </div>
+              </article>
             </div>
           ))}
+          </div>
         </section>
       ))}
       {cantTotal > 0 && (
         <div className="bar"><div>
-          <button style={{ width: "100%" }} disabled={cerrado || bajoMinimo} onClick={() => setPaso("datos")}>
+          <button className="ancho" disabled={cerrado || bajoMinimo} onClick={() => setPaso("datos")}>
             {cerrado ? "Local cerrado" : bajoMinimo ? `Faltan ${peso(minimo - total)} para el mínimo` : `Ver pedido (${cantTotal}) · ${peso(total)}`}
           </button>
         </div></div>
