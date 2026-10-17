@@ -5,6 +5,7 @@ import { aportarAGlobal, buscarPorBarcode, esCodigoValido } from "@/lib/barcode"
 import { peso } from "@/lib/whatsapp";
 import { margenPct } from "@/lib/margen";
 import Escaner from "./Escaner";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import CargaMasiva from "./CargaMasiva";
 import { BUCKET, comprimirImagen, rutaDeStorage, rutaFoto } from "@/lib/fotos";
 
@@ -37,6 +38,7 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [ed, setEd] = useState({ nombre: "", cat: "", precio: "", controla: false, stock: "", peso: false, plu: "", sinStock: false, minimo: "", objetivo: "", entrega: "3", prov: "" });
   const [provs, setProvs] = useState<{ id: string; nombre: string }[]>([]);
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const refNombre = useRef<HTMLInputElement>(null);
   const refPrecio = useRef<HTMLInputElement>(null);
 
@@ -120,13 +122,8 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
     const { error } = await supabase.from("productos").update({ disponible: !p.disponible }).eq("id", p.id);
     if (error) setAviso("No se pudo cambiar el stock."); else cargar();
   }
-  async function cambiarPrecio(p: Producto) {
-    const v = prompt(`Nuevo precio de ${p.nombre}`, String(p.precio));
-    if (v && !isNaN(num(v)) && num(v) >= 0) {
-      const { error } = await supabase.from("productos").update({ precio: num(v) }).eq("id", p.id);
-      if (error) setAviso("No se pudo cambiar el precio."); else cargar();
-    }
-  }
+  // El precio se cambia en el formulario de edición (antes era un prompt del navegador).
+  function cambiarPrecio(p: Producto) { abrirEdicion(p); }
   function abrirEdicion(p: Producto) { setEditId(editId === p.id ? null : p.id); setEd({ nombre: p.nombre, cat: p.categoria, precio: String(p.precio), controla: !!p.stock_controlado, stock: String(p.stock ?? 0), peso: !!p.vendido_por_peso, plu: p.plu ?? "", sinStock: !!p.permite_sin_stock, minimo: String(p.stock_minimo ?? 0), objetivo: p.stock_objetivo == null ? "" : String(p.stock_objetivo), entrega: String(p.lead_time_dias ?? 3), prov: p.proveedor_id ?? "" }); }
   async function guardarEdicion(p: Producto) {
     const n = capitalizar(ed.nombre); const pr = num(ed.precio);
@@ -141,13 +138,13 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
     const ent = ed.entrega.trim() === "" ? 3 : Math.floor(num(ed.entrega));
     if (ed.controla && (isNaN(mini) || mini < 0 || (obj !== null && (isNaN(obj) || obj < 0)))) { setAviso("El stock mínimo y el objetivo tienen que ser números iguales o mayores a cero."); return; }
     if (ed.controla && (isNaN(ent) || ent < 0 || ent > 60)) { setAviso("Los días de entrega van de 0 a 60."); return; }
-    if (ed.peso && !!p.vendido_por_peso !== ed.peso && p.stock_controlado && !confirm("Al pasar a venta por peso el stock se cuenta en GRAMOS. ¿Ya cargaste el stock en gramos?")) return;
+    if (ed.peso && !!p.vendido_por_peso !== ed.peso && p.stock_controlado && !(await confirmar({ titulo: "¿Cambiar a venta por peso?", detalle: "Al pasar a venta por peso el stock se cuenta en GRAMOS. ¿Ya cargaste el stock en gramos?", confirmar: "Sí, ya está en gramos", peligro: false }))) return;
     const { error } = await supabase.from("productos").update({ nombre: n, categoria: capitalizar(ed.cat) || "General", precio: pr, stock_controlado: ed.controla, vendido_por_peso: ed.peso, plu: plu || null, permite_sin_stock: ed.sinStock, ...(ed.controla ? { stock: st, disponible: st > 0 ? true : p.disponible, stock_minimo: mini, stock_objetivo: obj, lead_time_dias: ent, proveedor_id: ed.prov || null } : {}) }).eq("id", p.id);
     if (error) { setAviso("No se pudo guardar el cambio."); return; }
     setEditId(null); setAviso(`Actualizado ✔ ${n}`); cargar();
   }
   async function eliminar(p: Producto) {
-    if (!confirm(`¿Eliminar "${p.nombre}" del catálogo?`)) return;
+    if (!(await confirmar({ titulo: `¿Eliminar "${p.nombre}"?`, detalle: "Sale del catálogo. Los pedidos anteriores no se borran.", confirmar: "Sí, eliminar", peligro: true }))) return;
     const { error } = await supabase.from("productos").delete().eq("id", p.id);
     if (error) { setAviso("No se pudo eliminar."); return; }
     const ruta = rutaDeStorage(p.imagen_url); if (ruta) await supabase.storage.from(BUCKET).remove([ruta]);   // no dejar fotos huérfanas
@@ -181,6 +178,7 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   const puede = nombre.trim().length >= 2 && precio !== "" && !isNaN(num(precio)) && num(precio) >= 0 && !buscando && !guardando;
   return (
     <>
+      {ventanaConfirmar}
       <h2>Cargar producto</h2>
       {escaneando
         ? <Escaner onCode={alLeerCodigo} onClose={() => setEscaneando(false)} />
@@ -193,21 +191,24 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
       </label>
       {aviso && <p role="status" className="mut">{aviso}</p>}
       {buscando && <p className="mut">Buscando…</p>}
-      <input placeholder="Código de barras (opcional)" value={barcode} onChange={(e) => alTipearCodigo(e.target.value)} inputMode="numeric" />
-      <input ref={refNombre} placeholder="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} enterKeyHint="next"
+      <input placeholder="Código de barras (opcional)" aria-label="Código de barras" value={barcode} onChange={(e) => alTipearCodigo(e.target.value)} inputMode="numeric" />
+      <input ref={refNombre} placeholder="Nombre" aria-label="Nombre del producto" value={nombre} onChange={(e) => setNombre(e.target.value)} enterKeyHint="next"
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); refPrecio.current?.focus(); } }} />
-      <input ref={refPrecio} placeholder="Precio" value={precio} onChange={(e) => setPrecio(e.target.value)} inputMode="decimal" enterKeyHint="done"
+      <input ref={refPrecio} placeholder="Precio" aria-label="Precio" value={precio} onChange={(e) => setPrecio(e.target.value)} inputMode="decimal" enterKeyHint="done"
         onKeyDown={(e) => { if (e.key === "Enter" && puede) { e.preventDefault(); guardar(); } }} />
       <div className="chips" role="group" aria-label="Categoría">
         {categorias.map((c) => (<button key={c} type="button" className={c === cat ? "" : "sec"} onClick={() => setCat(c)}>{c}</button>))}
       </div>
-      <input placeholder="Otra categoría" value={cat} onChange={(e) => setCat(e.target.value)} />
+      <input placeholder="Otra categoría" aria-label="Otra categoría" value={cat} onChange={(e) => setCat(e.target.value)} />
       <button disabled={!puede} onClick={guardar}>{guardando ? "Guardando…" : "Guardar"}</button>
 
       <h2>Catálogo ({lista.length}{sinStock > 0 ? ` · ${sinStock} sin stock` : ""})</h2>
-      <input type="search" placeholder="Buscar por nombre o código" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="chips" role="group" aria-label="Filtrar por categoría">
-        {["Todas", ...catsUsadas].map((c) => (<button key={c} type="button" className={c === filtroCat ? "" : "sec"} onClick={() => setFiltroCat(c)}>{c}</button>))}
+      <div className="buscador-fijo">
+        <label className="sr-only" htmlFor="buscar-productos">Buscar producto</label>
+        <input id="buscar-productos" type="search" placeholder="Buscar por nombre o código" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="chips" role="group" aria-label="Filtrar por categoría">
+          {["Todas", ...catsUsadas].map((c) => (<button key={c} type="button" className={c === filtroCat ? "" : "sec"} aria-pressed={c === filtroCat} onClick={() => setFiltroCat(c)}>{c}</button>))}
+        </div>
       </div>
       {sinStock > 0 && (
         <label className="mut" style={{ display: "block", margin: "6px 0" }}>
@@ -229,10 +230,10 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
           </div>
           {editId === p.id && (
             <div style={{ marginTop: 10 }}>
-              <input value={ed.nombre} onChange={(e) => setEd({ ...ed, nombre: e.target.value })} placeholder="Nombre" />
+              <input value={ed.nombre} onChange={(e) => setEd({ ...ed, nombre: e.target.value })} placeholder="Nombre" aria-label="Nombre del producto" />
               <input value={ed.cat} onChange={(e) => setEd({ ...ed, cat: e.target.value })} placeholder="Categoría" list="cats-edit" />
               <datalist id="cats-edit">{categorias.map((c) => <option key={c} value={c} />)}</datalist>
-              <input value={ed.precio} onChange={(e) => setEd({ ...ed, precio: e.target.value })} placeholder="Precio" inputMode="decimal" />
+              <input value={ed.precio} onChange={(e) => setEd({ ...ed, precio: e.target.value })} placeholder="Precio" aria-label="Precio" inputMode="decimal" />
               {p.costo != null && (
                 <p className="mut" style={{ margin: ".2rem 0 .6rem" }}>
                   Último costo {peso(Number(p.costo))}{margenPct(num(ed.precio), Number(p.costo)) !== null ? ` · margen ${margenPct(num(ed.precio), Number(p.costo))}%` : ""}
@@ -283,7 +284,7 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
               <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
                 <button onClick={() => guardarEdicion(p)}>Guardar cambios</button>
                 <button className="sec" onClick={() => setEditId(null)}>Cancelar</button>
-                <button className="sec" onClick={() => eliminar(p)} style={{ color: "#c0392b" }}>Eliminar</button>
+                <button className="sec" onClick={() => eliminar(p)} style={{ color: "var(--danger)" }}>Eliminar</button>
               </div>
             </div>
           )}

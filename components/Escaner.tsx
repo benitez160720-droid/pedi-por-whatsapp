@@ -36,7 +36,7 @@ export default function Escaner({ onCode, onClose }: { onCode: (code: string) =>
   return (
     <div className="card">
       <video ref={videoRef} muted playsInline style={{ width: "100%", borderRadius: 10, background: "#000" }} />
-      {err && <p role="alert" style={{ color: "#c0392b" }}>{err}</p>}
+      {err && <p role="alert" style={{ color: "var(--danger)" }}>{err}</p>}
       <p className="mut">Apuntá al código de barras del producto.</p>
       <button className="sec" onClick={onClose}>Cerrar cámara</button>
     </div>

@@ -10,7 +10,7 @@ export default function ReporteZView({ z, kioscoNombre }: { z: ReporteZ; kioscoN
       <div className="ticket-print" id="ticket-imprimible" data-ancho="80">
         <div className="ticket-cab">
           <b>{kioscoNombre}</b>
-          <span>REPORTE Z · {z.estado === "cerrado" ? "Caja cerrada" : "Caja abierta (parcial)"}</span>
+          <span>RESUMEN DE LA CAJA · {z.estado === "cerrado" ? "Caja cerrada" : "Caja abierta (parcial)"}</span>
           <span>Apertura: {fecha(z.abierto_at)}</span>
           {z.cerrado_at && <span>Cierre: {fecha(z.cerrado_at)}</span>}
         </div>
@@ -18,7 +18,7 @@ export default function ReporteZView({ z, kioscoNombre }: { z: ReporteZ; kioscoN
           <div className="ticket-linea"><span>Fondo inicial</span><span>{peso(z.monto_inicial)}</span></div>
           {MEDIOS.map((m) => (<div className="ticket-linea" key={m}><span>Cobros {ETIQUETA_MEDIO[m].toLowerCase()}</span><span>{peso(z.cobros_por_medio[m] ?? 0)}</span></div>))}
           <div className="ticket-linea"><span>Refuerzos</span><span>{peso(z.refuerzos)}</span></div>
-          <div className="ticket-linea"><span>Sangrías y retiros</span><span>−{peso(z.sangrias_y_retiros)}</span></div>
+          <div className="ticket-linea"><span>Plata que saqué</span><span>−{peso(z.sangrias_y_retiros)}</span></div>
         </div>
         <div className="ticket-pagos">
           <div className="ticket-linea ticket-total"><span>EFECTIVO ESPERADO</span><span>{peso(z.efectivo_esperado)}</span></div>
@@ -38,7 +38,7 @@ export default function ReporteZView({ z, kioscoNombre }: { z: ReporteZ; kioscoN
         </div>
         <p className="ticket-gracias">La cuenta corriente no entra en la caja: queda anotada en Fiado.</p>
       </div>
-      <button className="sec no-print" onClick={() => window.print()}>Imprimir reporte Z</button>
+      <button className="sec no-print" onClick={() => window.print()}>Imprimir resumen</button>
     </div>
   );
 }

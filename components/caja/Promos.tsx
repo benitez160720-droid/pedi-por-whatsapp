@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import type { ProductoPos } from "@/lib/caja";
@@ -9,6 +10,7 @@ type Fila = Promo & { creada?: string };
 // Alta y edición de promociones automáticas (NxM por producto, % por producto o categoría).
 // En una misma venta gana la más conveniente para el cliente en cada renglón; no se suman.
 export default function Promos({ kiosco, productos, promos, onCambio }: { kiosco: Kiosco; productos: ProductoPos[]; promos: Promo[]; onCambio: () => void }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [todas, setTodas] = useState<Fila[] | null>(null);
   const [form, setForm] = useState<FormPromo | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function Promos({ kiosco, productos, promos, onCambio }: { kiosco
     await refrescar();
   }
   async function borrar(p: Fila) {
-    if (!window.confirm(`¿Eliminar la promoción “${p.nombre}”? Las ventas ya hechas no se modifican.`)) return;
+    if (!(await confirmar({ titulo: `¿Eliminar la promoción “${p.nombre}”?`, detalle: "Las ventas ya hechas no se modifican.", confirmar: "Sí, eliminar", peligro: true }))) return;
     const { error } = await supabase.from("pos_promos").delete().eq("id", p.id).eq("kiosco_id", kiosco.id);
     if (error) return setErr("No se pudo eliminar la promoción.");
     await refrescar();
@@ -58,6 +60,7 @@ export default function Promos({ kiosco, productos, promos, onCambio }: { kiosco
 
   return (
     <div>
+      {ventanaConfirmar}
       <p className="mut">Se aplican solas al cobrar. Si un producto entra en más de una, gana la que más le conviene al cliente (no se suman). El NxM no aplica a productos por peso.</p>
       {err && <p className="pos-error" role="alert">{err}</p>}
       {!form && <button onClick={() => { setForm({ ...PROMO_VACIA }); setEditId(null); setErr(""); }}>Nueva promoción</button>}

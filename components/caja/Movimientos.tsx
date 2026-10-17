@@ -34,8 +34,8 @@ export default function Movimientos({ resumen, turnoId, abierto, onCambio }: { r
         <div className="kpi kpi--fuerte"><span>Efectivo en caja</span><b className="mono">{peso(disponible)}</b></div>
       </div>
       <div className="card">
-        <p className="pos-kicker">Movimientos del turno</p>
-        {resumen.movimientos.length === 0 && <p className="mut">Todavía no hay sangrías ni refuerzos.</p>}
+        <p className="pos-kicker">Plata del turno</p>
+        {resumen.movimientos.length === 0 && <p className="mut">Todavía no sacaste ni agregaste plata.</p>}
         <div className="recibo">
           {resumen.movimientos.map((m, i) => (
             <div className="row" key={i}>
@@ -50,8 +50,8 @@ export default function Movimientos({ resumen, turnoId, abierto, onCambio }: { r
           <p className="pos-kicker">Registrar movimiento</p>
           <label>Tipo
             <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoMov)}>
-              <option value="sangria">Sangría — retiro parcial</option>
-              <option value="refuerzo">Refuerzo — agregar efectivo</option>
+              <option value="sangria">Sacar plata — retiro parcial</option>
+              <option value="refuerzo">Agregar plata — poner efectivo</option>
               <option value="retiro_final">Retiro final — vaciado</option>
             </select>
           </label>

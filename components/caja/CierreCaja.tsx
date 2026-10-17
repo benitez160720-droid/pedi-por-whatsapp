@@ -39,10 +39,10 @@ export default function CierreCaja({ kiosco, turnoId, refresco, onCerrada }: { k
         <p className="mut">Contá el efectivo físico en la caja e indicá el monto declarado.</p>
         {z && (
           <div className="recibo">
-            <div className="row"><span>Fondo inicial</span><b className="mono">{peso(z.monto_inicial)}</b></div>
+            <div className="row"><span>Plata con la que arranqué</span><b className="mono">{peso(z.monto_inicial)}</b></div>
             <div className="row"><span>Efectivo de ventas</span><b className="mono">{peso(z.cobros_por_medio.efectivo ?? 0)}</b></div>
-            <div className="row"><span>Refuerzos − sangrías</span><b className="mono">{peso(z.refuerzos - z.sangrias_y_retiros)}</b></div>
-            <div className="row total-fila"><span>Efectivo esperado</span><b className="mono">{peso(z.efectivo_esperado)}</b></div>
+            <div className="row"><span>Plata que agregué − plata que saqué</span><b className="mono">{peso(z.refuerzos - z.sangrias_y_retiros)}</b></div>
+            <div className="row total-fila"><span>Plata que debería haber</span><b className="mono">{peso(z.efectivo_esperado)}</b></div>
           </div>
         )}
         <label>Monto final declarado (efectivo)
@@ -63,7 +63,7 @@ export default function CierreCaja({ kiosco, turnoId, refresco, onCerrada }: { k
           )}
       </div>
       <div className="card">
-        <p className="pos-kicker">Reporte Z (parcial)</p>
+        <p className="pos-kicker">Resumen de la caja (parcial)</p>
         {z ? <ReporteZView z={z} kioscoNombre={kiosco.nombre} /> : <p className="mut">Cargando…</p>}
       </div>
     </div>

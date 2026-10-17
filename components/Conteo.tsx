@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import { cantidadDesdeTexto, cantidadTexto } from "@/lib/compras";
@@ -14,9 +15,12 @@ type Sesion = { id: string; criterio: "todos" | "bajo" | "categoria"; categoria:
 type Dif = { producto_id: string; nombre: string; por_peso: boolean; stock_actual: number; contado: number; diferencia: number; costo: number };
 
 export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [sesion, setSesion] = useState<Sesion | null | undefined>(undefined);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [filtro, setFiltro] = useState("");
+  const [unoPorUno, setUnoPorUno] = useState(false);
+  const [indice, setIndice] = useState(0);
   const [dif, setDif] = useState<{ lista: Dif[]; sinContar: number } | null>(null);
   const [resultado, setResultado] = useState("");
   const [msg, setMsg] = useState("");
@@ -35,7 +39,7 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
   const cargar = useCallback(async () => {
     const { data, error } = await supabase.rpc("conteo_actual", { p_kiosco: kiosco.id });
     if (error) { setMsg(mensajeReposicion(error.message)); return; }
-    const s = data as Sesion | null;
+    const s = data && !Array.isArray(data) ? (data as Sesion) : null;
     setSesion(s);
     setEdits({});
     setDif(null);
@@ -149,7 +153,7 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
 
   async function aplicar() {
     if (!sesion) return;
-    if (!confirm("¿Aplicar el conteo? El stock de los productos contados queda en lo que pusiste. Los que quedaron sin contar no cambian.")) return;
+    if (!await confirmar({ titulo: "¿Guardar lo contado? El stock de los productos contados queda en lo que pusiste. Los que quedaron sin contar no cambian.", confirmar: "Sí, seguir", peligro: false })) return;
     setOcupado(true); setMsg("");
     const ok = await guardarEdiciones();
     if (!ok) { setOcupado(false); return; }
@@ -157,17 +161,17 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
     setOcupado(false);
     if (error) return setMsg(mensajeReposicion(error.message));
     const r = data as { ajustados: number; sin_cambios: number; sin_contar: number };
-    setResultado(`Conteo aplicado: ${r.ajustados} ajustado${r.ajustados === 1 ? "" : "s"}, ${r.sin_cambios} sin cambios, ${r.sin_contar} sin contar.`);
+    setResultado(`Stock actualizado: ${r.ajustados} ajustado${r.ajustados === 1 ? "" : "s"}, ${r.sin_cambios} sin cambios, ${r.sin_contar} sin contar.`);
     await cargar();
   }
 
   async function descartar() {
-    if (!sesion || !confirm("¿Descartar el conteo? No se toca el stock.")) return;
+    if (!sesion || !await confirmar({ titulo: "¿Descartar el conteo? No se toca el stock.", confirmar: "Sí, seguir", peligro: true })) return;
     setOcupado(true);
     const { error } = await supabase.rpc("conteo_descartar", { p_sesion: sesion.id });
     setOcupado(false);
     if (error) return setMsg(mensajeReposicion(error.message));
-    setResultado("Conteo descartado. El stock no cambió.");
+    setResultado("Se descartó lo contado. El stock no cambió.");
     await cargar();
   }
 
@@ -175,7 +179,8 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
   if (sesion === null) {
     return (
       <>
-        <h2>Conteo de stock</h2>
+      {ventanaConfirmar}
+        <h2>Contar mercadería</h2>
         {resultado && <p role="status" className="ok">{resultado}</p>}
         <div className="card">
           <p className="mut" style={{ marginTop: 0 }}>Contá la mercadería en planilla y aplicá las diferencias de una sola vez. Mientras contás, las ventas siguen: cada diferencia se calcula contra el stock del momento de aplicar.</p>
@@ -194,7 +199,7 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
               </select>
             </label>
           )}
-          <button disabled={ocupado || (criterio === "categoria" && !categoria)} onClick={empezar}>Empezar conteo</button>
+          <button disabled={ocupado || (criterio === "categoria" && !categoria)} onClick={empezar}>Empezar a contar</button>
           {msg && <p role="alert" className="pos-error">{msg}</p>}
         </div>
       </>
@@ -203,7 +208,7 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
 
   return (
     <>
-      <div className="row"><h2 style={{ margin: 0 }}>Conteo en curso</h2><span className="mut">{contados} de {sesion.items.length} contados</span></div>
+      <div className="row"><h2 style={{ margin: 0 }}>Contando mercadería</h2><span className="mut">{contados} de {sesion.items.length} contados</span></div>
       <p className="mut">Escribí lo que hay en el estante. Dejá en blanco lo que todavía no contaste. Por peso, en kilos.</p>
       {msg && <p role="alert" className="pos-error">{msg}</p>}
       {resultado && <p role="status" className="ok">{resultado}</p>}
@@ -215,25 +220,39 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
       {lectura && <p role="status" className="mut"><b>{lectura}</b></p>}
       {verVinculo && <VincularCelular estado={vinculo.estado} url={vinculo.url} error={vinculo.error} ultimo={vinculo.ultimo} onCerrarVinculo={() => { vinculo.cerrar(); setVerVinculo(false); }} onOcultar={() => setVerVinculo(false)} />}
       <p className="mut" style={{ fontSize: 12 }}>Cada lectura suma 1 al producto. Si te pasás, corregí el número a mano.</p>
-      <input placeholder="Buscar producto…" value={filtro} onChange={(e) => setFiltro(e.target.value)} />
+      <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 8, margin: ".5rem 0" }}>
+        <button className={unoPorUno ? "" : "sec"} aria-pressed={unoPorUno} onClick={() => { setUnoPorUno(!unoPorUno); setIndice(0); }}>{unoPorUno ? "Ver la lista completa" : "Contar de a uno"}</button>
+      </div>
+      <input placeholder="Buscar producto…" value={filtro} onChange={(e) => { setFiltro(e.target.value); setIndice(0); }} />
+      {unoPorUno && visibles.length > 0 && (
+        <p className="mut" role="status" style={{ marginTop: 8 }}>Producto {Math.min(indice + 1, visibles.length)} de {visibles.length}</p>
+      )}
 
-      {visibles.map((i) => {
+      {(unoPorUno ? visibles.slice(Math.min(indice, Math.max(visibles.length - 1, 0)), Math.min(indice, Math.max(visibles.length - 1, 0)) + 1) : visibles).map((i) => {
         const txt = txtDe(i);
         const n = cantidadDesdeTexto(txt, i.por_peso);
         const cambio = n !== null && n !== i.stock_actual;
         return (
           <div className="card" id={`conteo-${i.producto_id}`} key={i.producto_id} style={{ margin: ".4rem 0" }}>
             <div className="row"><b>{i.nombre}</b><span className="mut">Sistema: {cantidadTexto(i.stock_actual, i.por_peso)}</span></div>
-            <input inputMode="decimal" placeholder="Contado" value={txt} onChange={(e) => setEdits({ ...edits, [i.producto_id]: e.target.value })}
-              style={cambio ? { borderColor: "#e67e22" } : undefined} />
+            <label style={{ display: "block", marginTop: 8 }}>Contado
+              <input inputMode="decimal" placeholder="Ej: 12" value={txt} autoFocus={unoPorUno} onChange={(e) => setEdits({ ...edits, [i.producto_id]: e.target.value })}
+                style={cambio ? { borderColor: "#e67e22" } : undefined} />
+            </label>
           </div>
         );
       })}
+      {unoPorUno && visibles.length > 0 && (
+        <div className="acciones" style={{ marginTop: 8 }}>
+          <button className="sec" disabled={indice === 0} onClick={() => setIndice((n) => Math.max(0, n - 1))}>← Anterior</button>
+          <button className="principal" disabled={indice >= visibles.length - 1} onClick={() => setIndice((n) => Math.min(visibles.length - 1, n + 1))}>Siguiente →</button>
+        </div>
+      )}
 
       <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
         <button className="sec" disabled={ocupado} onClick={guardarAvance}>Guardar avance</button>
         <button className="sec" disabled={ocupado} onClick={verDiferencias}>Ver diferencias</button>
-        <button disabled={ocupado || contados === 0} onClick={aplicar}>Aplicar conteo</button>
+        <button disabled={ocupado || contados === 0} onClick={aplicar}>Guardar lo contado</button>
         <button className="sec" disabled={ocupado} onClick={descartar}>Descartar</button>
       </div>
 
@@ -244,7 +263,7 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
           {dif.lista.map((d) => (
             <div className="row" key={d.producto_id}>
               <span>{d.nombre}: {cantidadTexto(d.stock_actual, d.por_peso)} → {cantidadTexto(d.contado, d.por_peso)}</span>
-              <b style={{ color: d.diferencia < 0 ? "#c0392b" : "#1e8449" }}>{d.diferencia > 0 ? "+" : "−"}{cantidadTexto(Math.abs(d.diferencia), d.por_peso)} · {peso(Math.abs(d.costo))}</b>
+              <b style={{ color: d.diferencia < 0 ? "var(--danger)" : "var(--ok)" }}>{d.diferencia > 0 ? "+" : "−"}{cantidadTexto(Math.abs(d.diferencia), d.por_peso)} · {peso(Math.abs(d.costo))}</b>
             </div>
           ))}
           <p className="mut" style={{ fontSize: 12 }}>Sin contar: {dif.sinContar}. Los valores se calculan a costo; los que queden sin contar no cambian al aplicar.</p>

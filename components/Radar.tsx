@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useEffect, useState } from "react";
 import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
 import { linkWhatsApp, peso } from "@/lib/whatsapp";
@@ -22,6 +23,7 @@ const ESTADO: Record<string, string> = {
 };
 
 export default function Radar({ kiosco }: { kiosco: Kiosco }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [msg, setMsg] = useState("");
   const [dias, setDias] = useState("45");
   const [minimo, setMinimo] = useState("3");
@@ -73,7 +75,7 @@ export default function Radar({ kiosco }: { kiosco: Kiosco }) {
   }
   async function darDeBaja(l: Lote) {
     if (!l.lote_id) return;
-    if (!confirm(`¿Dar de baja ${l.en_stock} unidad(es) por vencimiento? Queda registrado como merma.`)) return;
+    if (!(await confirmar({ titulo: `¿Dar de baja ${l.en_stock} unidad(es) por vencimiento?`, detalle: "Queda registrado como pérdida.", confirmar: "Sí, dar de baja", peligro: true }))) return;
     const { error } = await supabase.rpc("lote_dar_de_baja", { p_lote: l.lote_id, p_cantidad: l.en_stock });
     if (error) return setMsg(mensajeErrorSql(error.message));
     setMsg("Baja registrada ✔"); cargarLotes(prodId); cargarProductos();
@@ -87,22 +89,27 @@ export default function Radar({ kiosco }: { kiosco: Kiosco }) {
 
   return (
     <div>
-      <h1>Radar</h1>
+      {ventanaConfirmar}
+      <h1>Alertas del negocio</h1>
       {msg && <p role="status" className="mut">{msg}</p>}
 
       <section className="card">
-        <h2>Clientes en fuga</h2>
-        <p className="mut">Clientes identificados con {minimo}+ compras en el último año que hace más de {dias} días que no vuelven. El mensaje lo enviás vos por WhatsApp.</p>
+        <h2>Clientes que dejaron de venir</h2>
+        <p className="mut">Clientes con {minimo} o más compras en el último año que hace más de {dias} días que no vuelven. Vos decidís qué les mandás: el descuento lo aplicás vos en la caja.</p>
         <div className="row">
           <label>Días sin comprar <input type="number" value={dias} onChange={(e) => setDias(e.target.value)} style={{ width: 90 }} /></label>
           <label>Mínimo de compras <input type="number" value={minimo} onChange={(e) => setMinimo(e.target.value)} style={{ width: 90 }} /></label>
           <button className="sec" onClick={cargarFuga}>Buscar</button>
         </div>
-        {fuga.length === 0 && <p className="mut">No hay clientes en fuga con esos criterios.</p>}
+        {fuga.length === 0 && <p className="mut">No hay clientes que dejaron de venir con esos criterios.</p>}
         {fuga.map((c) => (
-          <div className="row" key={c.cliente_id} style={{ margin: "6px 0" }}>
-            <span style={{ minWidth: 0 }}>{c.nombre} · {c.compras} compras · {c.dias_sin_comprar} días sin venir</span>
-            <a href={linkWhatsApp(c.telefono, `Hola ${c.nombre.split(" ")[0]}! Hace ${c.dias_sin_comprar} días que no te vemos por ${kiosco.nombre}. Pasá cuando quieras, te esperamos.`)} target="_blank" rel="noreferrer">Escribir</a>
+          <div className="card" key={c.cliente_id} style={{ margin: "8px 0" }}>
+            <b>{c.nombre}</b>
+            <p className="mut" style={{ margin: ".2rem 0 .5rem" }}>{c.compras} compras · hace {c.dias_sin_comprar} días que no vuelve</p>
+            <div className="acciones" style={{ flexWrap: "wrap" }}>
+              <a className="btn principal" target="_blank" rel="noreferrer" href={linkWhatsApp(c.telefono, `Hola ${c.nombre.split(" ")[0]}! Hace ${c.dias_sin_comprar} días que no te vemos por ${kiosco.nombre}. Pasá cuando quieras, te esperamos.`)}>Escribirle por WhatsApp</a>
+              <a className="btn sec" target="_blank" rel="noreferrer" href={linkWhatsApp(c.telefono, `Hola ${c.nombre.split(" ")[0]}! Te escribimos de ${kiosco.nombre}. Tenés un 10 % de descuento en tu próxima compra. Mostrá este mensaje cuando pases.`)}>Ofrecerle 10 % de descuento</a>
+            </div>
           </div>
         ))}
       </section>
@@ -117,7 +124,7 @@ export default function Radar({ kiosco }: { kiosco: Kiosco }) {
           </div>
         ))}
         <div className="row">
-          <select value={tipo} onChange={(e) => setTipo(e.target.value as Regla["tipo"])}>
+          <select aria-label="Tipo de alerta" value={tipo} onChange={(e) => setTipo(e.target.value as Regla["tipo"])}>
             {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <input inputMode="decimal" placeholder="Umbral" value={umbral} onChange={(e) => setUmbral(e.target.value)} style={{ width: 120 }} aria-label="Umbral" />
@@ -137,7 +144,7 @@ export default function Radar({ kiosco }: { kiosco: Kiosco }) {
             <div className="row" style={{ marginTop: 8 }}>
               <input inputMode="numeric" placeholder="Unidades" value={loteCant} onChange={(e) => setLoteCant(e.target.value)} style={{ width: 110 }} aria-label="Unidades del lote" />
               <input type="date" value={loteVence} onChange={(e) => setLoteVence(e.target.value)} aria-label="Vencimiento del lote" />
-              <button onClick={agregarLote} disabled={!loteCant || !loteVence}>Agregar lote</button>
+              <button onClick={agregarLote} disabled={!loteCant || !loteVence}>Guardar vencimiento</button>
             </div>
             {lotes.length === 0 && <p className="mut">Todavía no hay lotes cargados para este producto.</p>}
             {lotes.map((l, i) => (
@@ -148,7 +155,7 @@ export default function Radar({ kiosco }: { kiosco: Kiosco }) {
                 {l.lote_id && l.en_stock > 0 && (
                   <span className="row">
                     {(l.estado === "vencido" || l.estado === "por_vencer") && <button className="sec" onClick={() => darDeBaja(l)}>Dar de baja</button>}
-                    <button className="sec" onClick={() => cerrarLote(l)}>Cerrar lote</button>
+                    <button className="sec" onClick={() => cerrarLote(l)}>Ya no queda</button>
                   </span>
                 )}
               </div>

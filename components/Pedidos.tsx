@@ -2,6 +2,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, type Kiosco, type Pedido } from "@/lib/supabase";
 import { ETIQUETA_PAGO, linkWhatsApp, normalizarTelefonoAR, peso } from "@/lib/whatsapp";
+import Pantalla from "@/components/ui/Pantalla";
+import Aviso from "@/components/ui/Aviso";
+import Insignia from "@/components/ui/Insignia";
+import EstadoVacio from "@/components/ui/EstadoVacio";
+import Esqueleto from "@/components/ui/Esqueleto";
+import { useConfirmar } from "@/components/ui/Confirmar";
 
 type Item = { nombre: string; cantidad: number; precio_unit: number };
 type PedidoConItems = Pedido & { pedido_items: Item[]; fiado_movimientos: { id: string }[] | { id: string } | null };
@@ -13,6 +19,13 @@ const ERRORES_FIADO: Record<string, string> = {
   monto_invalido: "El pedido no tiene un total para anotar.",
 };
 type Filtro = "hoy" | "pendientes" | "todos";
+const FILTROS: [Filtro, string][] = [["hoy", "Hoy"], ["pendientes", "Por atender"], ["todos", "Todos"]];
+const ESTADO: Record<Pedido["estado"], { texto: string; icono: string; tono: "alerta" | "info" | "ok" | "error" }> = {
+  pendiente: { texto: "Nuevo", icono: "●", tono: "alerta" },
+  confirmado: { texto: "Confirmado", icono: "✔", tono: "info" },
+  entregado: { texto: "Entregado", icono: "✔✔", tono: "ok" },
+  cancelado: { texto: "Cancelado", icono: "✖", tono: "error" },
+};
 
 // Aviso sonoro: el celular suele estar en el bolsillo o el mostrador, y en iPhone no hay vibración.
 function pitar() {
@@ -49,6 +62,7 @@ export default function Pedidos({ kiosco }: { kiosco: Kiosco }) {
   const [enVivo, setEnVivo] = useState(false);
   const enVivoRef = useRef(false);
   const pendientesPrev = useRef<number | null>(null);
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [sonido, setSonido] = useState(true);
   const sonidoRef = useRef(true);
   sonidoRef.current = sonido;
@@ -110,7 +124,7 @@ export default function Pedidos({ kiosco }: { kiosco: Kiosco }) {
     cargar();
   }
   async function quitarFiado(p: PedidoConItems) {
-    if (!confirm(`¿Quitar el fiado del pedido #${p.numero} (${peso(Number(p.total))})? Se descuenta de lo que debe ${p.cliente_nombre}.`)) return;
+    if (!(await confirmar({ titulo: `¿Quitar el fiado del pedido #${p.numero}?`, detalle: `Se descuentan ${peso(Number(p.total))} de lo que debe ${p.cliente_nombre}.`, confirmar: "Sí, quitar fiado", peligro: true }))) return;
     const { error: err } = await supabase.from("fiado_movimientos").delete().eq("pedido_id", p.id);
     if (err) { setError("No se pudo quitar el fiado."); return; }
     setAviso("Fiado quitado del pedido."); cargar();
@@ -123,29 +137,40 @@ export default function Pedidos({ kiosco }: { kiosco: Kiosco }) {
   const visibles = filtro === "hoy" ? hoy : filtro === "pendientes" ? lista.filter((p) => p.estado === "pendiente" || p.estado === "confirmado") : lista;
 
   return (
-    <>
+    <Pantalla titulo="Pedidos" ayuda="Acá llegan los pedidos que tus clientes hacen desde tu tienda. Tocá “Confirmar” cuando puedas prepararlo y “Avisar” para escribirle por WhatsApp.">
+      {ventanaConfirmar}
       <div className="card row" style={{ textAlign: "center" }}>
-        <div><b style={{ fontSize: 24 }}>{pendientes}</b><div className="mut">por confirmar</div></div>
-        <div><b style={{ fontSize: 24 }}>{hoy.length}</b><div className="mut">pedidos hoy</div></div>
-        <div><b style={{ fontSize: 24 }}>{peso(vendidoHoy)}</b><div className="mut">pedido hoy</div></div>
+        <div><b className="cifra">{pendientes}</b><div className="mut">por confirmar</div></div>
+        <div><b className="cifra">{hoy.length}</b><div className="mut">pedidos hoy</div></div>
+        <div><b className="cifra">{peso(vendidoHoy)}</b><div className="mut">pedido hoy</div></div>
       </div>
-      <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
-        {(["hoy", "pendientes", "todos"] as Filtro[]).map((f) => (
-          <button key={f} className={filtro === f ? "" : "sec"} onClick={() => setFiltro(f)}>{f === "hoy" ? "Hoy" : f === "pendientes" ? "Abiertos" : "Todos"}</button>
+      <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }} role="group" aria-label="Filtrar pedidos">
+        {FILTROS.map(([f, t]) => (
+          <button key={f} className={filtro === f ? "" : "sec"} aria-pressed={filtro === f} onClick={() => setFiltro(f)}>{t}</button>
         ))}
       </div>
       <div className="mut" style={{ margin: "4px 0" }} role="status">{enVivo ? "● En vivo: los pedidos aparecen al instante" : "Actualizando cada 15 segundos"}</div>
       <label className="mut" style={{ display: "block", margin: "6px 0" }}>
         <input type="checkbox" checked={sonido} onChange={(e) => setSonido(e.target.checked)} style={{ width: "auto", marginRight: 8 }} />Sonido cuando llega un pedido
       </label>
-      {error && <p role="alert" style={{ color: "#c0392b" }}>{error}</p>}
-      {aviso && <p role="status" className="mut">{aviso}</p>}
-      {cargado && visibles.length === 0 && <p className="mut">No hay pedidos para mostrar.</p>}
+      {error && <Aviso tipo="error">{error}</Aviso>}
+      {aviso && <Aviso tipo="ok">{aviso}</Aviso>}
+      {!cargado && !error && <Esqueleto lineas={3} />}
+      {cargado && visibles.length === 0 && (
+        <EstadoVacio titulo={filtro === "todos" ? "Todavía no recibiste pedidos" : "No hay pedidos en esta lista"}>
+          {filtro === "todos" ? "Cuando un cliente pida desde tu tienda, va a aparecer acá y te vamos a avisar." : "Probá con “Todos” para ver los pedidos anteriores."}
+        </EstadoVacio>
+      )}
       {visibles.map((p) => (
         <div className="card" key={p.id}>
-          <div className="row" onClick={() => setAbierto(abierto === p.id ? null : p.id)} style={{ cursor: "pointer" }}>
-            <b>#{p.numero} · {p.cliente_nombre}</b><span className="tag">{p.estado}{tieneFiado(p) ? " · fiado" : ""}</span>
-          </div>
+          <button type="button" className="fila-toggle" aria-expanded={abierto === p.id} onClick={() => setAbierto(abierto === p.id ? null : p.id)}>
+            <span>#{p.numero} · {p.cliente_nombre}</span>
+            <span className="acciones">
+              <Insignia tono={ESTADO[p.estado].tono} icono={ESTADO[p.estado].icono}>{ESTADO[p.estado].texto}</Insignia>
+              {tieneFiado(p) && <Insignia tono="neutro">Fiado</Insignia>}
+              <span className="mas">{abierto === p.id ? "Ocultar" : "Ver detalle"}</span>
+            </span>
+          </button>
           <div className="mut">
             {new Date(p.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} · {p.modalidad === "envio" ? `Envío: ${p.direccion}` : "Retiro"} · {peso(Number(p.total))} · {ETIQUETA_PAGO[p.medio_pago] ?? p.medio_pago}
           </div>
@@ -157,20 +182,20 @@ export default function Pedidos({ kiosco }: { kiosco: Kiosco }) {
             </ul>
           )}
           <div className="row" style={{ justifyContent: "flex-start", marginTop: 8, flexWrap: "wrap" }}>
-            {p.estado === "pendiente" && <button onClick={() => estado(p.id, "confirmado")}>Confirmar</button>}
+            {p.estado === "pendiente" && <button className="principal" onClick={() => estado(p.id, "confirmado")}>Confirmar pedido</button>}
             {p.estado === "confirmado" && (<>
-              <button onClick={() => estado(p.id, "entregado")}>Entregado</button>
+              <button className="principal" onClick={() => estado(p.id, "entregado")}>Marcar como entregado</button>
               <button className="sec" onClick={() => aFiado(p)}>Entregado a fiado</button>
             </>)}
             {p.estado === "entregado" && !tieneFiado(p) && <button className="sec" onClick={() => aFiado(p)}>Pasar a fiado</button>}
             {p.estado === "entregado" && tieneFiado(p) && <button className="sec" onClick={() => quitarFiado(p)}>Quitar fiado</button>}
-            <a className="btn sec" href={linkWhatsApp(normalizarTelefonoAR(p.cliente_telefono), mensajeAviso(kiosco, p))}>Avisar</a>
+            <a className="btn sec" aria-label={`Avisar a ${p.cliente_nombre} por WhatsApp`} href={linkWhatsApp(normalizarTelefonoAR(p.cliente_telefono), mensajeAviso(kiosco, p))}>Avisar por WhatsApp</a>
             {(p.estado === "pendiente" || p.estado === "confirmado") && (
-              <button className="sec" onClick={() => { if (confirm(`¿Cancelar el pedido #${p.numero}?`)) estado(p.id, "cancelado"); }}>Cancelar</button>
+              <button className="sec" onClick={async () => { if (await confirmar({ titulo: `¿Cancelar el pedido #${p.numero}?`, detalle: "El cliente no se entera solo: usá “Avisar” para contárselo.", confirmar: "Sí, cancelar pedido", peligro: true })) estado(p.id, "cancelado"); }}>Cancelar</button>
             )}
           </div>
         </div>
       ))}
-    </>
+    </Pantalla>
   );
 }

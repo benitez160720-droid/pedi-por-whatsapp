@@ -16,7 +16,9 @@ import ConfigPos from "./caja/ConfigPos";
 import { reconectarImpresora } from "@/lib/pos/impresora";
 
 type Seccion = "venta" | "ventas" | "buscar" | "movimientos" | "cierre" | "favoritos" | "promos" | "historial" | "config";
-const SECCIONES: [Seccion, string][] = [["venta", "Venta"], ["ventas", "Ventas del turno"], ["buscar", "Buscar ventas"], ["movimientos", "Movimientos"], ["cierre", "Cierre y Reporte Z"], ["favoritos", "Favoritos"], ["promos", "Promos"], ["historial", "Historial"], ["config", "Configuración"]];
+// Lo de todos los días a la vista; lo ocasional queda en "Más".
+const PRINCIPALES: [Seccion, string][] = [["venta", "Vender"], ["ventas", "Ventas de hoy"], ["movimientos", "Plata"], ["cierre", "Cerrar caja"]];
+const EN_MAS: [Seccion, string][] = [["buscar", "Buscar una venta"], ["favoritos", "Atajos"], ["promos", "Ofertas"], ["historial", "Cajas anteriores"], ["config", "Impresora y ajustes"]];
 
 const aTurno = (t: Turno): Turno => ({
   ...t, monto_inicial: Number(t.monto_inicial),
@@ -41,6 +43,7 @@ export default function Caja({ kiosco }: { kiosco: Kiosco }) {
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
   const [refresco, setRefresco] = useState(0);
+  const [masAbierto, setMasAbierto] = useState(false);
 
   const turno = useMemo(() => turnos.find((t) => t.estado === "abierto") ?? null, [turnos]);
 
@@ -110,7 +113,7 @@ export default function Caja({ kiosco }: { kiosco: Kiosco }) {
           <h2 className="pos-titulo">Abrir caja</h2>
           <p className="mut">Indicá el efectivo con el que empezás para arrancar a vender.</p>
           {aviso && <p className="pos-aviso" role="status">{aviso}</p>}
-          <label>Monto inicial (efectivo en caja)
+          <label>Plata con la que arrancás (efectivo en caja)
             <input type="number" inputMode="decimal" min={0} step={1} autoFocus value={fondo} onChange={(e) => setFondo(e.target.value)} placeholder="0"
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void abrir(); } }} />
           </label>
@@ -127,10 +130,16 @@ export default function Caja({ kiosco }: { kiosco: Kiosco }) {
   return (
     <div className="caja">
       <div className="caja-barra">
-        <span className="caja-estado"><i aria-hidden="true" /> Caja abierta · desde {fecha(turno.abierto_at)} · fondo {peso(turno.monto_inicial)}</span>
+        <span className="caja-estado"><i aria-hidden="true" /> Caja abierta · desde {fecha(turno.abierto_at)} · arrancaste con {peso(turno.monto_inicial)}</span>
         <nav className="pos-tabs" aria-label="Secciones de la caja">
-          {SECCIONES.map(([k, label]) => (<button key={k} className={seccion === k ? "on" : ""} onClick={() => setSeccion(k)}>{label}</button>))}
+          {PRINCIPALES.map(([k, label]) => (<button key={k} className={seccion === k ? "on" : ""} aria-current={seccion === k ? "page" : undefined} onClick={() => { setSeccion(k); setMasAbierto(false); }}>{label}</button>))}
+          <button type="button" className={EN_MAS.some(([k]) => k === seccion) || masAbierto ? "on" : ""} aria-expanded={masAbierto} onClick={() => setMasAbierto((v) => !v)}>Más ▾</button>
         </nav>
+        {masAbierto && (
+          <div className="pos-mas" role="group" aria-label="Más opciones de la caja">
+            {EN_MAS.map(([k, label]) => (<button key={k} type="button" className={seccion === k ? "on" : "sec"} onClick={() => { setSeccion(k); setMasAbierto(false); }}>{label}</button>))}
+          </div>
+        )}
       </div>
       {msg && <p className="pos-error" role="alert">{msg}</p>}
       {/* El POS queda montado (oculto) para no perder el carrito al cambiar de sección. */}

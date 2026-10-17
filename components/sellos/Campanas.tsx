@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmar } from "@/components/ui/Confirmar";
 import { useMemo, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
 import type { ProductoSello } from "../Sellos";
@@ -11,6 +12,7 @@ const alternar = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x 
 const ahoraLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
 export default function Campanas({ kiosco, campanas, productos, onCambio }: { kiosco: Kiosco; campanas: Campana[]; productos: ProductoSello[]; onCambio: () => void }) {
+  const [ventanaConfirmar, confirmar] = useConfirmar();
   const [form, setForm] = useState<(FormCampana & { id?: string }) | null>(null);
   const [msg, setMsg] = useState(""); const [ocupado, setOcupado] = useState(false);
   const categorias = useMemo(() => [...new Set(productos.map((p) => p.categoria))].sort(), [productos]);
@@ -29,25 +31,26 @@ export default function Campanas({ kiosco, campanas, productos, onCambio }: { ki
       : await supabase.from("fidelidad_campanas").insert({ ...fila, kiosco_id: kiosco.id });
     setOcupado(false);
     if (error) return setMsg(mensajeFidelidad(error.message));
-    setForm(null); setMsg("Campaña guardada ✔"); onCambio();
+    setForm(null); setMsg("Forma de sumar puntos guardada ✔"); onCambio();
   }
   async function activar(c: Campana) {
     const { error } = await supabase.from("fidelidad_campanas").update({ activa: !c.activa }).eq("id", c.id).eq("kiosco_id", kiosco.id);
     if (error) setMsg("No se pudo cambiar el estado."); else onCambio();
   }
   async function borrar(c: Campana) {
-    if (!window.confirm(`¿Borrar la campaña “${c.nombre}”? Los sellos que ya dio se conservan.`)) return;
+    if (!await confirmar({ titulo: `¿Borrar la campaña “${c.nombre}”? Los sellos que ya dio se conservan.`, confirmar: "Sí, seguir", peligro: true })) return;
     const { error } = await supabase.from("fidelidad_campanas").delete().eq("id", c.id).eq("kiosco_id", kiosco.id);
-    if (error) setMsg("No se pudo borrar."); else { setMsg("Campaña borrada."); onCambio(); }
+    if (error) setMsg("No se pudo borrar."); else { setMsg("Se borró la forma de sumar puntos."); onCambio(); }
   }
 
   return (
     <>
+      {ventanaConfirmar}
       <p className="mut">Las campañas activas se <b>suman</b>: una compra puede ganar sellos por varias a la vez. Los “sellos dobles” multiplican lo que dan las demás.</p>
       {msg && <p role="status" className="mut">{msg}</p>}
       {!form && (
         <div className="card">
-          <h3>Nueva campaña</h3>
+          <h3>Nueva forma de sumar puntos</h3>
           <p className="mut">Empezá con una plantilla o armá la tuya desde cero.</p>
           <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
             {PLANTILLAS.map((p) => <button key={p.titulo} className="sec" onClick={() => { setMsg(""); setForm({ ...CAMPANA_VACIA, ...p.form }); }}>{p.titulo}</button>)}
@@ -123,8 +126,8 @@ export default function Campanas({ kiosco, campanas, productos, onCambio }: { ki
         </div>
       )}
 
-      <h3>Tus campañas ({campanas.length})</h3>
-      {campanas.length === 0 && <p className="mut">Todavía no tenés campañas: sin ellas nadie suma sellos. Creá una arriba.</p>}
+      <h3>Tus formas de sumar puntos ({campanas.length})</h3>
+      {campanas.length === 0 && <p className="mut">Todavía no tenés formas de sumar puntos: sin ellas nadie junta puntos. Creá una arriba.</p>}
       {campanas.map((c) => (
         <div className="card" key={c.id} style={{ opacity: c.activa ? 1 : 0.6 }}>
           <div className="row"><b>{c.nombre}</b><span className="mut">{TIPOS.find((t) => t.tipo === c.tipo)?.titulo}{c.activa ? "" : " · pausada"}</span></div>
@@ -157,7 +160,7 @@ function Simulador({ kiosco, productos }: { kiosco: Kiosco; productos: ProductoS
   }
   return (
     <div className="card">
-      <h3>Probar mis campañas</h3>
+      <h3>Probar cuántos puntos se lleva un cliente</h3>
       <p className="mut">Simulá una compra para ver cuántos sellos daría (como si fuera un cliente nuevo). Sirve para chequear días, horarios y montos antes de avisarle a tus clientes.</p>
       <div className="etq-form">
         <div><label>Monto</label><input inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} /></div>
