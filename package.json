@@ -10,11 +10,12 @@
     "test:importar": "node tests/importar.test.mjs",
     "test:horario": "node tests/horario.test.mjs",
     "test:fotos": "node tests/fotos.test.mjs",
-    "test": "npm run test:importar && npm run test:horario && npm run test:fotos && npm run test:push && npm run test:pos && npm run test:compras && npm run test:etiquetas",
+    "test": "npm run test:importar && npm run test:horario && npm run test:fotos && npm run test:push && npm run test:pos && npm run test:compras && npm run test:etiquetas && npm run test:fidelidad",
     "test:push": "node tests/push.test.mjs",
     "test:pos": "node tests/pos.test.mjs",
     "test:compras": "node tests/compras.test.mjs",
-    "test:etiquetas": "node tests/etiquetas.test.mjs"
+    "test:etiquetas": "node tests/etiquetas.test.mjs",
+    "test:fidelidad": "node tests/fidelidad.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
