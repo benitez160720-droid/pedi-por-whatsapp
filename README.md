@@ -36,5 +36,14 @@ Proyecto Supabase `pedi-por-whatsapp` (ref `ydhdbkkubllfdksusyil`, sa-east-1). M
 
 ## v0.5 (Etapa 3) — operación diaria
 - `0004_operacion_kiosco.sql`: tienda abierta/cerrada, horario, pedido mínimo, costo de envío, medios de pago; `crear_pedido` con límite anti-spam (3 pedidos/teléfono y 30/local cada 10 min) y devuelve el número de pedido. **Aplicar en el SQL Editor de Supabase ANTES de subir el código nuevo.**
-- Tests: `supabase/tests/etapa3_test.py` (15 chequeos sobre 0001–0004).
+- `0005_pedido_a_fiado.sql`: `pasar_a_fiado(pedido)` anota el total del pedido en la libreta del cliente (una sola vez por pedido) y lo deja entregado. **Aplicar en el SQL Editor de Supabase ANTES de subir el código nuevo.**
+- `0006_cierre_etapa3.sql` (cierre de la etapa; **aplicar ANTES de subir el código**, todo junto en el SQL Editor):
+  - **Horario automático:** `horario_auto` + `horarios` (hasta 2 tramos por día, admite cruzar la medianoche, hora de Argentina). `crear_pedido` rechaza con `fuera_de_horario`; el interruptor manual funciona como pausa. Espejo en `lib/horario.ts`.
+  - **Moderación de la base global:** nadie escribe directo en `productos_globales`; cada usuario aporta con `aportar_global` y el nombre se publica a la red cuando **2 usuarios distintos coinciden**. Lo que ya existía queda como verificado.
+  - **Fotos de producto:** bucket público `productos` (máx. 512 KB, jpeg/webp/png); solo el dueño escribe en `<kiosco_id>/…`. La app las reduce a ≤ 400 KB antes de subir.
+  - **Realtime:** `pedidos` entra en la publicación `supabase_realtime`; el panel recibe los pedidos al instante (con consulta de respaldo).
+  - Slugs reservados (`panel`, `terminos`, `privacidad`, `api`).
+- Páginas `/terminos` y `/privacidad` (borrador): se muestran con aviso hasta que `NEXT_PUBLIC_LEGAL_REVISADO=1`; el email se configura con `NEXT_PUBLIC_CONTACTO_EMAIL`.
+- Tests de base (Postgres embebido: `pip install pgserver psycopg2-binary`): `supabase/tests/etapa3_test.py` (15, sobre 0001–0004), `etapa4_test.py` (22, sobre 0001–0005) y `etapa5_test.py` (61, sobre 0001–0006).
+- Tests de la app: `npm test` (importación de planillas, horario, rutas de fotos).
 - Límite: el tope por teléfono se esquiva cambiando de número; el tope por local acota el daño (30 cada 10 min).

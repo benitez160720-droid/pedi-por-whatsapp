@@ -2,14 +2,8 @@ import { supabase } from "./supabase";
 
 export type ProductoEncontrado = { nombre: string; imagen_url?: string | null; fuente: "global" | "openfoodfacts" };
 
-// EAN-8, UPC-A (12) o EAN-13, con dígito verificador. Evita consultar códigos mal leídos por la cámara.
-export function esCodigoValido(codigo: string): boolean {
-  if (!/^(\d{8}|\d{12}|\d{13})$/.test(codigo)) return false;
-  const d = codigo.split("").map(Number);
-  const check = d.pop()!;
-  const suma = d.reverse().reduce((s, n, i) => s + n * (i % 2 === 0 ? 3 : 1), 0);
-  return (10 - (suma % 10)) % 10 === check;
-}
+import { esCodigoValido } from "./ean";
+export { esCodigoValido };
 
 // Las tres bases del proyecto Open*Facts usan la misma API:
 //  - openfoodfacts:     alimentos, bebidas, golosinas
@@ -49,10 +43,11 @@ export async function buscarPorBarcode(barcode: string): Promise<ProductoEncontr
   return { ...mejor, imagen_url: mejor.imagen_url ?? resultados.find((r) => r?.imagen_url)?.imagen_url ?? null };
 }
 
-/** Aporta el producto a la base global (si ya existe, no pisa nada). */
-export async function aportarAGlobal(barcode: string, nombre: string, fuente: "global" | "openfoodfacts" | "kiosco") {
-  await supabase.from("productos_globales").upsert(
-    { barcode, nombre, fuente: fuente === "global" ? "kiosco" : fuente },
-    { onConflict: "barcode", ignoreDuplicates: true }
-  );
+/**
+ * Aporta el nombre a la base de la red. No escribe directo: la base lo guarda como aporte de este usuario y recién
+ * lo publica para todos cuando otro usuario distinto coincide en el nombre (migración 0006). Si falla, no se avisa:
+ * el producto ya quedó guardado en el kiosco y el aporte es un extra.
+ */
+export async function aportarAGlobal(barcode: string, nombre: string) {
+  try { await supabase.rpc("aportar_global", { p_barcode: barcode, p_nombre: nombre }); } catch { /* aporte opcional */ }
 }

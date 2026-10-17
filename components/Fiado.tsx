@@ -4,7 +4,7 @@ import { supabase, type Kiosco } from "@/lib/supabase";
 import { linkWhatsApp, normalizarTelefonoAR, peso } from "@/lib/whatsapp";
 
 type Cli = { id: string; nombre: string; telefono: string; saldo: number; ultimo_movimiento: string | null };
-type Mov = { id: string; tipo: "fiado" | "pago"; monto: number; created_at: string };
+type Mov = { id: string; tipo: "fiado" | "pago"; monto: number; created_at: string; nota: string | null };
 const num = (s: string) => Number(s.replace(",", "."));
 
 export default function Fiado({ kiosco }: { kiosco: Kiosco }) {
@@ -26,7 +26,7 @@ export default function Fiado({ kiosco }: { kiosco: Kiosco }) {
     setMonto(""); setMsg("");
     if (abierto === id) { setAbierto(null); return; }
     setAbierto(id);
-    const { data } = await supabase.from("fiado_movimientos").select("id,tipo,monto,created_at").eq("cliente_id", id).order("created_at", { ascending: false }).limit(10);
+    const { data } = await supabase.from("fiado_movimientos").select("id,tipo,monto,created_at,nota").eq("cliente_id", id).order("created_at", { ascending: false }).limit(10);
     setMovs((data ?? []) as Mov[]);
   }
 
@@ -37,7 +37,7 @@ export default function Fiado({ kiosco }: { kiosco: Kiosco }) {
     if (error) { setMsg("No se pudo guardar."); return; }
     setMonto(""); setMsg(tipo === "fiado" ? "Anotado ✔" : "Pago registrado ✔");
     await cargar();
-    const { data } = await supabase.from("fiado_movimientos").select("id,tipo,monto,created_at").eq("cliente_id", c.id).order("created_at", { ascending: false }).limit(10);
+    const { data } = await supabase.from("fiado_movimientos").select("id,tipo,monto,created_at,nota").eq("cliente_id", c.id).order("created_at", { ascending: false }).limit(10);
     setMovs((data ?? []) as Mov[]);
   }
 
@@ -78,7 +78,7 @@ export default function Fiado({ kiosco }: { kiosco: Kiosco }) {
                 )}
               </div>
               <ul style={{ margin: "10px 0 0", paddingLeft: 20 }} className="mut">
-                {movs.map((m) => (<li key={m.id}>{new Date(m.created_at).toLocaleDateString("es-AR")} · {m.tipo === "fiado" ? "se llevó" : "pagó"} {peso(Number(m.monto))}</li>))}
+                {movs.map((m) => (<li key={m.id}>{new Date(m.created_at).toLocaleDateString("es-AR")} · {m.tipo === "fiado" ? "se llevó" : "pagó"} {peso(Number(m.monto))}{m.nota ? ` · ${m.nota}` : ""}</li>))}
                 {movs.length === 0 && <li>Sin movimientos todavía.</li>}
               </ul>
             </>

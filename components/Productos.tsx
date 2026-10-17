@@ -4,6 +4,8 @@ import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
 import { aportarAGlobal, buscarPorBarcode, esCodigoValido } from "@/lib/barcode";
 import { peso } from "@/lib/whatsapp";
 import Escaner from "./Escaner";
+import CargaMasiva from "./CargaMasiva";
+import { BUCKET, comprimirImagen, rutaDeStorage, rutaFoto } from "@/lib/fotos";
 
 const num = (s: string) => Number(s.replace(",", "."));
 const capitalizar = (s: string) => { const t = s.trim().replace(/\s+/g, " "); return t ? t[0].toUpperCase() + t.slice(1) : t; };
@@ -24,6 +26,8 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   const [aviso, setAviso] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [masiva, setMasiva] = useState(false);
+  const [subiendo, setSubiendo] = useState<string | null>(null);
   // catálogo
   const [q, setQ] = useState("");
   const [filtroCat, setFiltroCat] = useState("Todas");
@@ -100,7 +104,7 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
     });
     setGuardando(false);
     if (error) { setAviso(error.code === "23505" ? "Ese código ya está en tu catálogo." : "No se pudo guardar, probá de nuevo."); return; }
-    if (barcode) await aportarAGlobal(barcode, nombreOk, fuente);
+    if (barcode) await aportarAGlobal(barcode, nombreOk);
     limpiar(); setAviso(`Guardado ✔ ${nombreOk}`); await cargar();
     if (rafaga) setEscaneando(true); else enfocar(refNombre);
   }
@@ -127,7 +131,33 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   async function eliminar(p: Producto) {
     if (!confirm(`¿Eliminar "${p.nombre}" del catálogo?`)) return;
     const { error } = await supabase.from("productos").delete().eq("id", p.id);
-    if (error) setAviso("No se pudo eliminar."); else { setEditId(null); setAviso("Eliminado ✔"); cargar(); }
+    if (error) { setAviso("No se pudo eliminar."); return; }
+    const ruta = rutaDeStorage(p.imagen_url); if (ruta) await supabase.storage.from(BUCKET).remove([ruta]);   // no dejar fotos huérfanas
+    setEditId(null); setAviso("Eliminado ✔"); cargar();
+  }
+
+  async function subirFoto(p: Producto, file: File | undefined) {
+    if (!file || subiendo) return;
+    setSubiendo(p.id); setAviso("");
+    const ruta = rutaFoto(kiosco.id, p.id);
+    try {
+      const blob = await comprimirImagen(file);
+      const { error } = await supabase.storage.from(BUCKET).upload(ruta, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
+      if (error) throw error;
+      const url = supabase.storage.from(BUCKET).getPublicUrl(ruta).data.publicUrl;
+      const { error: e2 } = await supabase.from("productos").update({ imagen_url: url }).eq("id", p.id);
+      if (e2) { await supabase.storage.from(BUCKET).remove([ruta]); throw e2; }
+      const vieja = rutaDeStorage(p.imagen_url); if (vieja) await supabase.storage.from(BUCKET).remove([vieja]);
+      setAviso(`Foto guardada ✔ ${p.nombre}`); cargar();
+    } catch (e) {
+      setAviso(e instanceof Error && e.message === "imagen_muy_grande" ? "La foto es demasiado pesada. Probá con otra." : "No se pudo subir la foto. Probá de nuevo.");
+    } finally { setSubiendo(null); }
+  }
+  async function quitarFoto(p: Producto) {
+    const { error } = await supabase.from("productos").update({ imagen_url: null }).eq("id", p.id);
+    if (error) { setAviso("No se pudo quitar la foto."); return; }
+    const ruta = rutaDeStorage(p.imagen_url); if (ruta) await supabase.storage.from(BUCKET).remove([ruta]);
+    setAviso("Foto quitada ✔"); cargar();
   }
 
   const puede = nombre.trim().length >= 2 && precio !== "" && !isNaN(num(precio)) && num(precio) >= 0 && !buscando && !guardando;
@@ -137,6 +167,8 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
       {escaneando
         ? <Escaner onCode={alLeerCodigo} onClose={() => setEscaneando(false)} />
         : <button onClick={() => { setAviso(""); setEscaneando(true); }}>📷 Escanear código</button>}
+      <button className="sec" style={{ marginLeft: 8 }} onClick={() => setMasiva(!masiva)}>📥 Carga masiva</button>
+      {masiva && <CargaMasiva kiosco={kiosco} existentes={lista} onListo={() => { cargar(); setAviso("Carga masiva lista ✔"); }} onCerrar={() => setMasiva(false)} />}
       <label className="mut" style={{ display: "block", margin: "10px 0" }}>
         <input type="checkbox" checked={rafaga} onChange={(e) => setRafaga(e.target.checked)} style={{ width: "auto", marginRight: 8 }} />
         Seguir escaneando después de guardar
@@ -168,8 +200,9 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
       {visibles.slice(0, limite).map((p) => (
         <div className="card" key={p.id} style={p.disponible ? undefined : { opacity: 0.7 }}>
           <div className="row">
-            <div onClick={() => abrirEdicion(p)} style={{ cursor: "pointer", minWidth: 0 }}>
-              <div>{p.nombre} <span className="mut">✎</span></div><span className="mut">{p.categoria}</span>
+            <div onClick={() => abrirEdicion(p)} style={{ cursor: "pointer", minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
+              {p.imagen_url && <img src={p.imagen_url} alt="" width={44} height={44} loading="lazy" style={{ objectFit: "cover", borderRadius: 8, flex: "none", background: "var(--bd)" }} />}
+              <div style={{ minWidth: 0 }}><div>{p.nombre} <span className="mut">✎</span></div><span className="mut">{p.categoria}</span></div>
             </div>
             <div className="qty">
               <button className="sec" onClick={() => cambiarPrecio(p)}>{peso(Number(p.precio))}</button>
@@ -182,6 +215,14 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
               <input value={ed.cat} onChange={(e) => setEd({ ...ed, cat: e.target.value })} placeholder="Categoría" list="cats-edit" />
               <datalist id="cats-edit">{categorias.map((c) => <option key={c} value={c} />)}</datalist>
               <input value={ed.precio} onChange={(e) => setEd({ ...ed, precio: e.target.value })} placeholder="Precio" inputMode="decimal" />
+              <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", margin: "0 0 10px" }}>
+                <label className="btn sec" aria-busy={subiendo === p.id}>
+                  {subiendo === p.id ? "Subiendo…" : p.imagen_url ? "📷 Cambiar foto" : "📷 Agregar foto"}
+                  <input type="file" accept="image/*" style={{ display: "none" }} disabled={subiendo !== null}
+                    onChange={(e) => { subirFoto(p, e.target.files?.[0]); e.target.value = ""; }} />
+                </label>
+                {p.imagen_url && <button className="sec" onClick={() => quitarFoto(p)}>Quitar foto</button>}
+              </div>
               <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
                 <button onClick={() => guardarEdicion(p)}>Guardar cambios</button>
                 <button className="sec" onClick={() => setEditId(null)}>Cancelar</button>

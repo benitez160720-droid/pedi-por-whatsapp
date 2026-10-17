@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
+import Link from "next/link";
+import { estadoTienda, resumenHorario, textoApertura } from "@/lib/horario";
 import { ETIQUETA_PAGO, linkWhatsApp, mensajePedido, normalizarTelefonoAR, peso } from "@/lib/whatsapp";
 
 const ERRORES: [string, string][] = [
@@ -10,6 +12,7 @@ const ERRORES: [string, string][] = [
   ["nombre_invalido", "Poné tu nombre."],
   ["kiosco_no_encontrado", "No encontramos este local."],
   ["local_cerrado", "El local está cerrado por ahora. Probá más tarde."],
+  ["fuera_de_horario", "El local está fuera de su horario de atención. Probá cuando abra."],
   ["minimo_no_alcanzado", "No llegás al monto mínimo del pedido."],
   ["medio_pago_invalido", "Ese medio de pago no está disponible. Elegí otro."],
   ["demasiados_pedidos", "Ya enviaste varios pedidos hace un momento. Esperá unos minutos."],
@@ -33,6 +36,9 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
   const [medio, setMedio] = useState(kiosco.medios_pago?.[0] ?? "efectivo");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
+  // La hora se toma recién en el navegador (no en el servidor) para que no se desfase con la página en caché.
+  const [ahora, setAhora] = useState<Date | null>(null);
+  useEffect(() => { setAhora(new Date()); const t = setInterval(() => setAhora(new Date()), 30000); return () => clearInterval(t); }, []);
   const [q, setQ] = useState("");
   const [catSel, setCatSel] = useState("Todas");
   const [listo, setListo] = useState<{ link: string; total: number; numero?: number } | null>(null);
@@ -54,7 +60,10 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
   const minimo = Number(kiosco.pedido_minimo ?? 0);
   const bajoMinimo = total < minimo;
   const envio = modalidad === "envio" ? Number(kiosco.costo_envio ?? 0) : 0;
-  const cerrado = kiosco.abierto === false;
+  const estado = ahora ? estadoTienda(kiosco, ahora) : kiosco.abierto === false ? "pausada" : "abierta";
+  const cerrado = estado !== "abierta";
+  const proxima = estado === "fuera_de_horario" && ahora ? textoApertura(kiosco.horarios ?? {}, ahora) : null;
+  const horarioTexto = kiosco.horario_auto ? resumenHorario(kiosco.horarios ?? {}) : kiosco.horario;
   const categorias = useMemo(() => Array.from(new Set(productos.map((p) => p.categoria))), [productos]);
   const porCategoria = useMemo(() => {
     const nq = norm(q.trim());
@@ -139,7 +148,7 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
         <label>Nota (opcional)<textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} /></label>
         {error && <p role="alert" style={{ color: "#c0392b" }}>{error}</p>}
         <button style={{ width: "100%" }} disabled={!ok || enviando} onClick={enviar}>{enviando ? "Enviando…" : "Enviar pedido por WhatsApp"}</button>
-        <p className="mut">Usamos tu nombre y teléfono solo para gestionar este pedido con {kiosco.nombre}.</p>
+        <p className="mut">Usamos tu nombre y teléfono solo para gestionar este pedido con {kiosco.nombre}. <Link href="/privacidad">Política de privacidad</Link>.</p>
         <button className="sec" onClick={() => { if (confirm("¿Vaciar el pedido?")) { setCart({}); setPaso("catalogo"); } }}>Vaciar pedido</button>
       </>
     );
@@ -149,8 +158,8 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
     <>
       <h1>{kiosco.nombre}</h1>
       {kiosco.direccion && <p className="mut">{kiosco.direccion}</p>}
-      {kiosco.horario && <p className="mut">Horario: {kiosco.horario}</p>}
-      {cerrado && <div className="card" role="status"><b>Cerrado por ahora</b><p className="mut" style={{ margin: "4px 0 0" }}>Podés mirar los precios, pero no se reciben pedidos hasta que abra.</p></div>}
+      {horarioTexto && <p className="mut">Horario: {horarioTexto}</p>}
+      {cerrado && <div className="card" role="status"><b>{estado === "fuera_de_horario" ? "Fuera de horario" : "Cerrado por ahora"}</b>{proxima && <span> · {proxima}</span>}<p className="mut" style={{ margin: "4px 0 0" }}>Podés mirar los precios, pero no se reciben pedidos hasta que abra.</p></div>}
       {!cerrado && minimo > 0 && <p className="mut">Pedido mínimo: {peso(minimo)}</p>}
       {productos.length === 0 && <p className="mut">Este kiosco todavía no cargó productos.</p>}
       {productos.length > 0 && (
@@ -169,7 +178,10 @@ export default function Tienda({ kiosco, productos }: { kiosco: Kiosco; producto
           <h2>{cat}</h2>
           {ps.map((p) => (
             <div className="card row" key={p.id}>
-              <div style={{ minWidth: 0 }}><div>{p.nombre}</div><b>{peso(Number(p.precio))}</b></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                {p.imagen_url && <img src={p.imagen_url} alt="" width={56} height={56} loading="lazy" style={{ objectFit: "cover", borderRadius: 8, flex: "none", background: "var(--bd)" }} />}
+                <div style={{ minWidth: 0 }}><div>{p.nombre}</div><b>{peso(Number(p.precio))}</b></div>
+              </div>
               <div className="qty">
                 {cart[p.id] ? (<><button className="sec" onClick={() => cambiar(p.id, -1)} aria-label="Quitar uno">−</button><span>{cart[p.id]}</span></>) : null}
                 <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.nombre}`}>+</button>
