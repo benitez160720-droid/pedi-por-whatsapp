@@ -48,7 +48,8 @@ jobs:
           # --clean intenta DROP POLICY sobre tablas que todavía no existen.
           psql "$TEST_URL" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade;"
           # Sin triggers: el de Database Webhook (push-pedidos) llama a producción; no debe quedar activo en la prueba.
-          pg_restore --list backup.dump | grep -v ' TRIGGER ' > restore.list
+          # Sin claves foráneas: el dump solo trae public, y kioscos.owner_id apunta a auth.users (vacía en la prueba).
+          pg_restore --list backup.dump | grep -v -E ' (TRIGGER|FK CONSTRAINT) ' > restore.list
           pg_restore --no-owner --no-privileges --exit-on-error -L restore.list --dbname "$TEST_URL" backup.dump
           echo "Restauración terminada."
       - name: Comparar tablas y conteos con producción
