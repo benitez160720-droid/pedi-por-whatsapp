@@ -17,11 +17,23 @@ export default function Home() {
   return (
     <>
       <header className="afiche portada">
-        <h1>Tu kiosco en WhatsApp<span className="punto">.</span></h1>
-        <p>Tus clientes piden desde el celular y vos recibís el pedido listo en tu WhatsApp.</p>
-        <p style={{ marginTop: "1.25rem" }}>
-          <Link className="btn btn-grande" href="/panel">Entrar a mi kiosco</Link>
-        </p>
+        <div>
+          <h1>Tu kiosco en <mark>WhatsApp</mark></h1>
+          <p>Tus clientes piden desde el celular y vos recibís el pedido listo en tu WhatsApp.</p>
+          <p style={{ marginTop: "1.25rem" }}>
+            <Link className="btn btn-grande" href="/panel">Entrar a mi kiosco</Link>
+          </p>
+        </div>
+        <figure className="muestra" aria-label="Ejemplo de un pedido recibido">
+          <div className="muestra-cab"><span>Pedido de Marcela</span><b>Ejemplo</b></div>
+          <ul>
+            <li><span>2 × Alfajor triple</span><span>3.200</span></li>
+            <li><span>1 × Gaseosa 1,5 L</span><span>2.100</span></li>
+            <li><span>3 × Chicle menta</span><span>1.500</span></li>
+          </ul>
+          <div className="muestra-tot"><span>Total</span><b>$ 6.800</b></div>
+          <p className="muestra-pie">Te llega por WhatsApp, listo para confirmar</p>
+        </figure>
       </header>
 
       <section className="portada-sec" aria-labelledby="como">
