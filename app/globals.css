@@ -442,3 +442,41 @@ button.ancho { width: 100%; }
   background: linear-gradient(to top right, transparent calc(50% - 1.2px), var(--ink) calc(50% - 1.2px), var(--ink) calc(50% + 1.2px), transparent calc(50% + 1.2px));
   pointer-events: none;
 }
+
+/* Menú principal del panel: barra oscura fija arriba para que no se pierda
+   entre el contenido al scrollear. Solo afecta a .tabs (el panel). */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  gap: 0;
+  margin: 1rem calc(var(--gutter) * -1) 1.25rem;
+  padding: 0 var(--gutter);
+  background: var(--ink);
+  border-bottom: 3px solid var(--clay);
+  box-shadow: 0 8px 18px rgba(22,33,28,.20);
+}
+.tabs button,
+.tabs button.sec {
+  min-height: 56px;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(246,243,236,.66);
+  box-shadow: none;
+  font-size: .82rem;
+  letter-spacing: .07em;
+}
+.tabs button:hover,
+.tabs button.sec:hover {
+  background: rgba(246,243,236,.07);
+  color: var(--paper);
+  transform: none;
+  box-shadow: none;
+}
+.tabs button:not(.sec) { color: #fff; background: rgba(246,243,236,.05); }
+.tabs button::after { height: 4px; bottom: 0; background: var(--clay); }
+@media (max-width: 640px) {
+  .tabs button, .tabs button.sec { padding: 0 .8rem; min-height: 52px; }
+}
