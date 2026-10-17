@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/reposicion", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/fiado", "schedule": "0 12 * * 1" }
+  ]
+}

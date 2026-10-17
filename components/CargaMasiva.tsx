@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
 import { KIT } from "@/lib/kit";
 import { normNombre, parsePlanilla, parsePrecio, type FilaImport } from "@/lib/importar";
@@ -11,6 +11,13 @@ export default function CargaMasiva({ kiosco, existentes, onListo, onCerrar }: {
   const [texto, setTexto] = useState("");
   const [msg, setMsg] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [proveedores, setProveedores] = useState<{ id: string; nombre: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from("proveedores").select("id,nombre").eq("kiosco_id", kiosco.id).eq("activo", true).order("nombre")
+      .then(({ data }) => setProveedores((data ?? []) as { id: string; nombre: string }[]));
+  }, [kiosco.id]);
+  const idPorProveedor = useMemo(() => new Map(proveedores.map((p) => [normNombre(p.nombre), p.id])), [proveedores]);
 
   const nombres = useMemo(() => new Set(existentes.map((p) => normNombre(p.nombre))), [existentes]);
   const barcodes = useMemo(() => new Set(existentes.map((p) => p.barcode).filter(Boolean) as string[]), [existentes]);
@@ -19,7 +26,7 @@ export default function CargaMasiva({ kiosco, existentes, onListo, onCerrar }: {
     const p = parsePrecio(precios[`${cat}|${n}`] ?? "");
     return p !== null && p > 0 ? [{ nombre: n, precio: p, categoria: cat, barcode: null }] : [];
   })), [kit, precios]);
-  const plan = useMemo(() => parsePlanilla(texto, nombres, barcodes), [texto, nombres, barcodes]);
+  const plan = useMemo(() => parsePlanilla(texto, nombres, barcodes, new Set(idPorProveedor.keys())), [texto, nombres, barcodes, idPorProveedor]);
 
   async function leerArchivo(f: File | undefined) {
     if (!f) return;
@@ -34,7 +41,13 @@ export default function CargaMasiva({ kiosco, existentes, onListo, onCerrar }: {
     if (guardando || filas.length === 0) return;
     setGuardando(true); setMsg("");
     for (let i = 0; i < filas.length; i += 200) {
-      const lote = filas.slice(i, i + 200).map((f) => ({ kiosco_id: kiosco.id, nombre: f.nombre, precio: f.precio, categoria: f.categoria, barcode: f.barcode }));
+      const lote = filas.slice(i, i + 200).map((f) => ({
+        kiosco_id: kiosco.id, nombre: f.nombre, precio: f.precio, categoria: f.categoria, barcode: f.barcode,
+        ...(f.stock != null ? { stock_controlado: true, stock: f.stock, stock_minimo: f.minimo ?? 0, disponible: f.stock > 0 } : {}),
+        ...(f.objetivo != null ? { stock_objetivo: f.objetivo } : {}),
+        ...(f.dias != null ? { lead_time_dias: f.dias } : {}),
+        ...(f.proveedorNombre ? { proveedor_id: idPorProveedor.get(normNombre(f.proveedorNombre)) ?? null } : {}),
+      }));
       const { error } = await supabase.from("productos").insert(lote);
       if (error) {
         setGuardando(false);
@@ -81,13 +94,13 @@ export default function CargaMasiva({ kiosco, existentes, onListo, onCerrar }: {
 
       {modo === "planilla" && (
         <>
-          <p className="mut">Una línea por producto: <b>nombre ; precio ; categoría ; código</b> (categoría y código son opcionales). Podés copiar y pegar desde Excel o Google Sheets.</p>
+          <p className="mut">Una línea por producto: <b>nombre ; precio ; categoría ; código ; stock ; stock mínimo ; stock objetivo ; días de entrega ; proveedor</b>. Todo lo que va después del precio es opcional; si ponés stock, el producto controla stock. El objetivo es hasta cuánto reponer (tiene que ser mayor o igual al mínimo). El proveedor tiene que estar cargado antes en Proveedores. Podés copiar y pegar desde Excel o Google Sheets.</p>
           <p><label className="mut">O subí un archivo .csv (en Excel: Guardar como → CSV): <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(e) => { leerArchivo(e.target.files?.[0]); e.target.value = ""; }} /></label></p>
-          <textarea rows={8} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={"Coca-Cola 2,25 L;3500;Bebidas;7790895000782\nAlfajor triple;900;Golosinas"} />
+          <textarea rows={8} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={"Coca-Cola 2,25 L;3500;Bebidas;7790895000782;24;6;30;3;Coca Dist\nAlfajor triple;900;Golosinas"} />
           {texto.trim() && (
             <>
               <p>✔ {plan.filas.length} para cargar{plan.duplicados > 0 ? ` · ${plan.duplicados} repetidos (se omiten)` : ""}{plan.errores.length > 0 ? ` · ${plan.errores.length} con error` : ""}</p>
-              {plan.filas.slice(0, 5).map((f, i) => (<div className="mut" key={i}>{f.nombre} · {f.categoria} · {peso(f.precio)}</div>))}
+              {plan.filas.slice(0, 5).map((f, i) => (<div className="mut" key={i}>{f.nombre} · {f.categoria} · {peso(f.precio)}{f.stock != null ? ` · stock ${f.stock}` : ""}{f.objetivo != null ? ` · objetivo ${f.objetivo}` : ""}{f.dias != null ? ` · ${f.dias} días` : ""}{f.proveedorNombre ? ` · ${f.proveedorNombre}` : ""}</div>))}
               {plan.filas.length > 5 && <div className="mut">… y {plan.filas.length - 5} más</div>}
               {plan.errores.slice(0, 5).map((e, i) => (<div key={i} style={{ color: "#c0392b" }}>{e.linea > 0 ? `Línea ${e.linea}: ` : ""}{e.motivo}{e.texto ? ` — ${e.texto}` : ""}</div>))}
             </>
