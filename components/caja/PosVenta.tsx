@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
+import FidelidadCaja from "./FidelidadCaja";
+import { mensajeFidelidad, pctDePremio, type Premio } from "@/lib/fidelidad";
 import { cantidadTexto, fecha, mensajeError, norm, type Cliente, type LineaCarrito, type PagoVenta, type PosConfig, type ProductoPos, type Turno } from "@/lib/caja";
 import { DetectorEscaneo } from "@/lib/pos/escaneo";
 import { formatoPeso, mismoPlu, parsearBalanza } from "@/lib/pos/balanza";
@@ -34,6 +36,8 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
   const [lineas, setLineas] = useState<LineaCarrito[]>([]);
   const [descPct, setDescPct] = useState("");
   const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [premio, setPremio] = useState<Premio | null>(null);
+  const [avisoFid, setAvisoFid] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [buscaCliente, setBuscaCliente] = useState(false);
   const [filtroCliente, setFiltroCliente] = useState("");
@@ -61,8 +65,17 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
   const [verVinculo, setVerVinculo] = useState(false);
   const ocupadoRef = useRef(false);
   const cola = useMemo(() => new ColaVentas(typeof window === "undefined" ? { getItem: () => null, setItem: () => {} } : window.localStorage, `pos-cola:${kiosco.id}`), [kiosco.id]);
-  const calc = useMemo(() => calcularVenta(lineas, promos, Number(descPct.replace(",", ".")) || 0), [lineas, promos, descPct]);
-  const tot = useMemo(() => ({ subtotal: calc.subtotal, descuento: calc.descuento, total: calc.total, pct: Math.min(100, Math.max(0, Number(descPct.replace(",", ".")) || 0)) }), [calc, descPct]);
+  // Premio canjeado: su descuento (en %) reemplaza al manual y se recalcula si cambia el carrito.
+  const sinPremio = useMemo(() => calcularVenta(lineas, promos, 0), [lineas, promos]);
+  const pctPremio = useMemo(() => {
+    if (!premio || premio.tipo === "libre") return 0;
+    const l = lineas.find((x) => x.producto_id === premio.producto_id);
+    return pctDePremio(premio, sinPremio.total, l?.precio ?? 0, l ? l.precio * l.cantidad : 0);
+  }, [premio, lineas, sinPremio.total]);
+  const descUsado = premio && premio.tipo !== "libre" ? String(pctPremio) : descPct;
+  const calc = useMemo(() => calcularVenta(lineas, promos, Number(descUsado.replace(",", ".")) || 0), [lineas, promos, descUsado]);
+  const tot = useMemo(() => ({ subtotal: calc.subtotal, descuento: calc.descuento, total: calc.total, pct: Math.min(100, Math.max(0, Number(descUsado.replace(",", ".")) || 0)) }), [calc, descUsado]);
+  useEffect(() => { setPremio(null); if (cliente) setAvisoFid(""); }, [cliente?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const refrescarCola = useCallback(() => { setPendientes(cola.pendientes().length); setRechazadas(cola.rechazadas().map((v) => ({ offline_id: v.offline_id, total: v.total, motivo: v.motivo, fecha: v.fecha }))); }, [cola]);
   // Lo vendido sin conexión y aún no sincronizado ya no está disponible en el stock local.
   const stockLibre = useCallback((p: { id: string; stock: number }) => p.stock - (cola.reservado()[p.id] ?? 0), [cola]);
@@ -121,6 +134,16 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
     setLineas((ls) => ls.map((l, k) => (k === i ? { ...l, descuento_pct: n } : l)));
   };
 
+  const aplicarPremio = (p: Premio) => {
+    if (!navigator.onLine) return error("Sin conexión: el canje se hace cuando vuelva internet.");
+    if (p.tipo === "producto") {
+      const prod = porId.get(p.producto_id ?? "");
+      if (!prod || !prod.disponible || prod.vendido_por_peso) return error("El producto del premio no está disponible para canjear en la Caja.");
+      if (!lineasRef.current.some((l) => l.producto_id === prod.id)) agregar(prod);
+    } else if (!lineasRef.current.length && p.tipo !== "libre") return error("Cargá primero los productos y después canjeá el premio.");
+    setAvisoFid(""); setPremio(p); sonar("ok");
+  };
+
   const vaciar = useCallback(() => {
     if (!lineas.length && !cliente && !descPct) return;
     if (lineas.length && !window.confirm("¿Vaciar todo el carrito?")) return;
@@ -162,8 +185,25 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
   };
   const terminarVenta = () => { setCobrando(false); setLineas([]); setDescPct(""); setCliente(null); setMsg(""); sonar("venta"); };
 
+  /** Después de cobrar: registra el canje (si hubo) y avisa cuántos sellos ganó el cliente. Si falla, la venta ya está hecha: se avisa. */
+  async function cierreFidelidad(cli: Cliente | null, pre: Premio | null, ventaId: string) {
+    if (!cli) return;
+    const partes: string[] = [];
+    if (pre) {
+      const { error: e } = await supabase.rpc("fidelidad_canjear", { p_cliente: cli.id, p_premio: pre.id, p_venta: ventaId });
+      partes.push(e ? `⚠ No se pudo descontar el canje de "${pre.nombre}" (${mensajeFidelidad(e.message)}). Hacelo desde Sellos.` : `Canje: ${pre.nombre}${pre.tipo === "libre" ? " — entregalo al cliente" : ""}.`);
+    }
+    const g = await supabase.from("sellos").select("cantidad").eq("venta_id", ventaId).eq("anulado", false);
+    const ganados = (g.data ?? []).reduce((a, x) => a + Number(x.cantidad), 0);
+    const sd = await supabase.from("clientes_sellos").select("sellos_disponibles").eq("id", cli.id).maybeSingle();
+    if (ganados > 0) partes.push(`+${ganados} sello${ganados === 1 ? "" : "s"} para ${cli.nombre}${sd.data ? ` (tiene ${sd.data.sellos_disponibles})` : ""}.`);
+    else if (sd.data) partes.push(`${cli.nombre} tiene ${sd.data.sellos_disponibles} sellos.`);
+    if (partes.length) setAvisoFid(partes.join(" "));
+  }
+
   async function confirmarCobro(pagos: PagoVenta[]): Promise<string | null> {
     const offlineId = crypto.randomUUID();
+    const cliVenta = cliente; const premioVenta = premio;
     const items = lineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad, descuento_pct: l.descuento_pct }));
     const args = { p_turno: turno.id, p_items: items, p_pagos: pagos, p_cliente: cliente?.id ?? null, p_descuento_pct: tot.pct, p_offline_id: offlineId };
     const guardarSinConexion = () => {
@@ -172,6 +212,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
       const vuelto = Math.max(0, Math.round((pagos.reduce((a, p) => a + p.monto, 0) - tot.total) * 100) / 100);
       const t = armarTicket(0, { subtotal: tot.subtotal, descuento: tot.descuento, total: tot.total, vuelto: efectivo > 0 ? vuelto : 0 }, pagos, true);
       setTicket(t); void salidaVenta(t, pagos);
+      if (premioVenta) setAvisoFid(`⚠ La venta quedó pendiente de sincronizar: canjeá "${premioVenta.nombre}" desde Sellos cuando vuelva internet.`);
       refrescarCola(); terminarVenta();
     };
     if (!navigator.onLine) { guardarSinConexion(); return null; }
@@ -181,11 +222,12 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
       if (!(err as { code?: string }).code) { guardarSinConexion(); return null; }
       return mensajeError(err.message);
     }
-    const r = data as { numero: number; subtotal: number; descuento: number; total: number; vuelto: number };
+    const r = data as { venta_id: string; numero: number; subtotal: number; descuento: number; total: number; vuelto: number };
     const t = armarTicket(Number(r.numero), { subtotal: Number(r.subtotal), descuento: Number(r.descuento), total: Number(r.total), vuelto: Number(r.vuelto) }, pagos, false);
     setTicket(t); void salidaVenta(t, pagos);
     terminarVenta();
     onVendida();
+    void cierreFidelidad(cliVenta, premioVenta, r.venta_id);
     return null;
   }
 
@@ -411,6 +453,8 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
             </span>
           </div>
           {cliente && <p className="mut pos-saldo">Saldo en cuenta corriente: <b className={cliente.saldo > 0 ? "neg" : "ok"}>{peso(cliente.saldo)}</b></p>}
+          {cliente && <FidelidadCaja kiosco={kiosco} cliente={cliente} aplicado={premio} pct={pctPremio} descuento={Math.max(0, calc.descuento - sinPremio.descuento)} online={online} onAplicar={aplicarPremio} onQuitar={() => setPremio(null)} />}
+          {avisoFid && <p role="status" className="pos-saldo" style={{ margin: ".4rem 0 0" }}><b>{avisoFid}</b></p>}
           {buscaCliente && (
             <div className="pos-cli-buscar">
               <input ref={inputCli} value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Buscar por nombre o teléfono…" aria-label="Buscar cliente" autoComplete="off"
