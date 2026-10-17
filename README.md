@@ -75,3 +75,16 @@ Límites: el aviso llega si el navegador o la app instalada siguen con permiso; 
 - `0015_proveedores_compras.sql` (**aplicar DESPUÉS de 0014**): proveedores con cuenta corriente (compras suman deuda, pagos la restan), compras con ingreso de mercadería que suma stock y guarda el último costo (`productos.costo`, no visible en la tienda pública), pago al instante o a cuenta, anulación de compra (no se deja si ya se vendió parte de esa mercadería), ajuste manual de stock con motivo y historial de movimientos. Todo se escribe por funciones; el cliente solo lee. Test: `supabase/tests/etapa13_test.py` (41 chequeos, sobre 0001–0015).
 - Panel: pestaña **Proveedores** (Catálogo → Proveedores). Los productos por peso se cargan en kg y se guardan en gramos.
 - Límites conocidos: los pagos a proveedores no mueven la caja del turno (no entran en el arqueo); el historial de stock registra compras, anulaciones y ajustes, no las ventas.
+
+## Fase 3, operación (0024, 0025)
+- `0024_endurecer_funciones.sql`: `search_path` fijo en funciones auxiliares y sin acceso por API a funciones de trigger de fidelidad.
+- `0025_fuga_reglas_lotes.sql` (**aplicar DESPUÉS de 0024**; sin DROP ni DELETE):
+  - **Clientes en fuga** (`clientes_en_fuga`): clientes identificados con 3+ compras en el último año y sin comprar hace más de 45 días (parámetros ajustables). La app arma el mensaje; lo envía el dueño por WhatsApp.
+  - **Avisos "avisame cuando"** (`avisos_reglas`, `regla_crear`, `reglas_avisos_diarios`): tipos fijos `venta_supera` (ventas de ayer, una vez por día), `fiado_supera` y `stock_bajo_de` (una vez por semana). Lo que no se reconoce no dispara. El cron diario de reposición manda **una** notificación por kiosco con las novedades.
+  - **Lotes con vencimiento, FEFO virtual** (`lotes_stock`, `lote_registrar`, `lotes_repartir`, `lote_dar_de_baja`, `lote_cerrar`): el stock actual se reparte desde el lote que vence más tarde hacia atrás (se asume que se vende primero lo que vence antes). La baja solo se permite sobre el lote que vence primero con unidades en stock y queda como ajuste con motivo `vencimiento`. **Nunca cambia precios.**
+  - Test: `supabase/tests/etapa21_test.py` (29 chequeos).
+- Panel: pestaña **Radar** (grupo Negocio) con Clientes en fuga, Mis avisos y Vencimientos.
+- Carga masiva: columnas `nombre ; precio ; categoría ; código ; stock ; mínimo ; objetivo ; días de entrega ; proveedor`. El proveedor tiene que existir antes.
+- Errores: `lib/errores.ts` con el mensaje de cada `raise exception` de las migraciones; `tests/errores.test.mjs` falla si aparece un código nuevo sin mensaje.
+- **Datos de demo (ficticios)**: `supabase/seed_demo.sql`, para pegar en el SQL Editor. Carga en el kiosco más viejo, si tiene 5 productos o menos: 3 proveedores, 12 productos, 6 clientes, ventas de 60 días, fiado, un turno y, si la 0025 está aplicada, lotes y avisos. Test: `supabase/tests/seed_demo_test.py`.
+- Pendiente: aplicar la 0025 en la base de Pedí y probar la restauración del backup.

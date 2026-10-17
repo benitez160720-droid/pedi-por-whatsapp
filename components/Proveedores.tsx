@@ -1,9 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
-import { peso } from "@/lib/whatsapp";
 import type { Seleccion } from "@/lib/etiquetas";
 import { cantidadDesdeTexto, cantidadTexto, mensajeCompras, totalCompra, totalLinea, type LineaCompra, type MovStock, type Proveedor } from "@/lib/compras";
+import { variacionCosto, UMBRAL_VARIACION_COSTO } from "@/lib/margen";
+import { ETIQUETA_MOTIVO, ETIQUETA_TIPO_MOV, MOTIVOS_AJUSTE, mensajeReposicion, type ReporteMermas } from "@/lib/reposicion";
+import { peso } from "@/lib/whatsapp";
 
 type Compra = { id: string; numero: number; total: number; pagado: number; comprobante: string | null; anulada: boolean; created_at: string };
 type Pago = { id: string; tipo: "compra" | "pago"; monto: number; medio: string | null; nota: string | null; created_at: string };
@@ -12,7 +14,11 @@ const MEDIOS: [string, string][] = [["efectivo", "Efectivo"], ["transferencia", 
 const fecha = (s: string) => new Date(s).toLocaleDateString("es-AR");
 const FORM_VACIO = { nombre: "", telefono: "", cuit: "", notas: "" };
 
-export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; onEtiquetas?: (sel: Seleccion[]) => void }) {
+export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaUsada }: {
+  kiosco: Kiosco; onEtiquetas?: (sel: Seleccion[]) => void;
+  // Compra armada desde "Para reponer": abre el proveedor con las líneas cargadas para revisar y guardar.
+  precarga?: { proveedorId: string; lineas: LineaCompra[] } | null; onPrecargaUsada?: () => void;
+}) {
   const [ultima, setUltima] = useState<Seleccion[]>([]);
   const [vista, setVista] = useState<"proveedores" | "stock">("proveedores");
   const [lista, setLista] = useState<Proveedor[]>([]);
@@ -31,12 +37,13 @@ export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; o
   const [pagaAhora, setPagaAhora] = useState(""); const [medioCompra, setMedioCompra] = useState("efectivo"); const [comprobante, setComprobante] = useState("");
   // Historial y ajuste de stock
   const [hist, setHist] = useState<MovStock[]>([]);
-  const [ajProd, setAjProd] = useState(""); const [ajNuevo, setAjNuevo] = useState(""); const [ajMotivo, setAjMotivo] = useState("");
+  const [ajProd, setAjProd] = useState(""); const [ajNuevo, setAjNuevo] = useState(""); const [ajMotivo, setAjMotivo] = useState(""); const [ajTipo, setAjTipo] = useState("manual");
+  const [periodoMermas, setPeriodoMermas] = useState<"7" | "30" | "mes">("30"); const [mermas, setMermas] = useState<ReporteMermas | null>(null);
 
   const cargar = useCallback(async () => {
     const [p, pr] = await Promise.all([
       supabase.from("proveedores_saldo").select("*").eq("kiosco_id", kiosco.id).order("saldo", { ascending: false }).order("nombre"),
-      supabase.from("productos").select("id,kiosco_id,nombre,categoria,precio,disponible,stock_controlado,stock,vendido_por_peso,barcode").eq("kiosco_id", kiosco.id).order("nombre"),
+      supabase.from("productos").select("id,kiosco_id,nombre,categoria,precio,disponible,stock_controlado,stock,vendido_por_peso,barcode,costo").eq("kiosco_id", kiosco.id).order("nombre"),
     ]);
     if (p.error) setMsg("No pudimos cargar los proveedores."); else setLista((p.data ?? []).map((x) => ({ ...x, saldo: Number(x.saldo) })) as Proveedor[]);
     setProductos((pr.data ?? []) as Producto[]);
@@ -44,11 +51,19 @@ export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; o
   useEffect(() => { void cargar(); }, [cargar]);
 
   const cargarHistorial = useCallback(async () => {
-    const { data } = await supabase.from("stock_movimientos").select("id,tipo,cantidad,stock_resultante,motivo,created_at,productos(nombre,vendido_por_peso)")
+    const { data } = await supabase.from("stock_movimientos").select("id,tipo,cantidad,stock_resultante,motivo,motivo_tipo,created_at,productos(nombre,vendido_por_peso)")
       .eq("kiosco_id", kiosco.id).order("created_at", { ascending: false }).limit(40);
     setHist((data ?? []) as unknown as MovStock[]);
   }, [kiosco.id]);
-  useEffect(() => { if (vista === "stock") void cargarHistorial(); }, [vista, cargarHistorial]);
+  const cargarMermas = useCallback(async () => {
+    const hasta = new Date(Date.now() + 86400000);
+    const desde = periodoMermas === "mes" ? new Date(new Date().getFullYear(), new Date().getMonth(), 1) : new Date(Date.now() - Number(periodoMermas) * 86400000);
+    const { data, error } = await supabase.rpc("reporte_mermas", { p_kiosco: kiosco.id, p_desde: desde.toISOString(), p_hasta: hasta.toISOString() });
+    if (error) return setMsg(mensajeReposicion(error.message));
+    const r = data as { total_perdida: number | string; por_motivo: ReporteMermas["por_motivo"]; top: ReporteMermas["top"] };
+    setMermas({ total_perdida: Number(r.total_perdida), por_motivo: r.por_motivo.map((x) => ({ ...x, unidades: Number(x.unidades), costo: Number(x.costo) })), top: r.top.map((x) => ({ ...x, unidades: Number(x.unidades), costo: Number(x.costo) })) });
+  }, [kiosco.id, periodoMermas]);
+  useEffect(() => { if (vista === "stock") { void cargarHistorial(); void cargarMermas(); } }, [vista, cargarHistorial, cargarMermas]);
 
   async function detalle(id: string) {
     const [c, m] = await Promise.all([
@@ -64,6 +79,15 @@ export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; o
     setAbierto(id); await detalle(id);
   }
   const refrescar = async (id?: string) => { await cargar(); if (id) await detalle(id); };
+  useEffect(() => {
+    if (!precarga) return;
+    setVista("proveedores");
+    setAbierto(precarga.proveedorId); void detalle(precarga.proveedorId);
+    empezarCompra(precarga.proveedorId); setLineas(precarga.lineas);
+    setMsg("Revisá cantidades y costos antes de guardar. Los productos sin último costo quedaron en 0.");
+    onPrecargaUsada?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [precarga]);
 
   async function guardarProveedor() {
     if (!form) return;
@@ -99,6 +123,12 @@ export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; o
 
   async function guardarCompra(p: Proveedor) {
     if (lineas.length === 0) return setMsg("Agregá al menos un producto.");
+    // Aviso si el costo cambió mucho respecto del último cargado (por peso, ambos son por kg).
+    const cambios = lineas.map((l) => {
+      const v = variacionCosto(productos.find((x) => x.id === l.producto_id)?.costo, l.costo);
+      return v ? `• ${l.nombre}: ${peso(v.anterior)} → ${peso(v.nuevo)} (${v.pct > 0 ? "+" : ""}${v.pct}%)` : null;
+    }).filter((x): x is string => x !== null);
+    if (cambios.length && !confirm(`Hay costos que cambiaron más de ${UMBRAL_VARIACION_COSTO}%:\n${cambios.join("\n")}\n\n¿Guardar la compra igual?`)) return;
     const pag = pagaAhora.trim() === "" ? 0 : num(pagaAhora);
     if (!(pag >= 0) || pag > total) return setMsg("Lo que pagás ahora no puede superar el total.");
     setOcupado(true); setMsg("");
@@ -127,10 +157,10 @@ export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; o
     const nuevo = ajNuevo.trim() === "0" ? 0 : n;
     if (nuevo === null) return setMsg(pr.vendido_por_peso ? "El stock nuevo va en kg (ej. 2,5)." : "El stock nuevo tiene que ser un número entero.");
     setOcupado(true); setMsg("");
-    const { error } = await supabase.rpc("ajustar_stock", { p_producto: pr.id, p_nuevo: nuevo, p_motivo: ajMotivo });
+    const { error } = await supabase.rpc("ajustar_stock", { p_producto: pr.id, p_nuevo: nuevo, p_motivo: ajMotivo, p_tipo: ajTipo });
     setOcupado(false);
     if (error) return setMsg(mensajeCompras(error.message));
-    setAjProd(""); setAjNuevo(""); setAjMotivo(""); setMsg("Stock ajustado ✔"); await Promise.all([cargar(), cargarHistorial()]);
+    setAjProd(""); setAjNuevo(""); setAjMotivo(""); setAjTipo("manual"); setMsg("Stock ajustado ✔"); await Promise.all([cargar(), cargarHistorial(), cargarMermas()]);
   }
 
   const deuda = lista.filter((p) => p.saldo > 0).reduce((s, p) => s + p.saldo, 0);
@@ -244,6 +274,26 @@ export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; o
       {vista === "stock" && (
         <>
           <div className="card">
+            <div className="row"><h3 style={{ margin: 0 }}>Mermas y pérdidas</h3>
+              <select value={periodoMermas} onChange={(e) => setPeriodoMermas(e.target.value as "7" | "30" | "mes")} style={{ width: "auto" }}>
+                <option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option><option value="mes">Este mes</option>
+              </select></div>
+            {mermas && (
+              <>
+                <div className="mut">Perdido en el período (a costo)</div>
+                <b style={{ fontSize: 26 }}>{peso(mermas.total_perdida)}</b>
+                <div className="mut" style={{ margin: ".4rem 0" }}>
+                  {mermas.por_motivo.map((m) => `${ETIQUETA_MOTIVO[m.motivo] ?? m.motivo}: ${peso(m.costo)}`).join(" · ") || "Sin ajustes negativos en el período."}
+                </div>
+                {mermas.top.length > 0 && <>
+                  <div className="mut">Productos con más pérdida</div>
+                  {mermas.top.map((t) => <div className="row" key={t.nombre}><span>{t.nombre} · {cantidadTexto(t.unidades, t.por_peso)}</span><b>{peso(t.costo)}</b></div>)}
+                </>}
+                <p className="mut" style={{ margin: ".4rem 0 0", fontSize: 12 }}>Valorizado al costo actual de cada producto. El conteo físico no suma como pérdida.</p>
+              </>
+            )}
+          </div>
+          <div className="card">
             <h3 style={{ marginTop: 0 }}>Ajustar stock</h3>
             <p className="mut" style={{ margin: ".2rem 0" }}>Para conteos, roturas o vencimientos. Queda registrado con el motivo.</p>
             <select value={ajProd} onChange={(e) => setAjProd(e.target.value)}>
@@ -251,7 +301,10 @@ export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; o
               {controlados.map((x) => <option key={x.id} value={x.id}>{x.nombre} (hay {cantidadTexto(x.stock ?? 0, !!x.vendido_por_peso)})</option>)}
             </select>
             <input inputMode="decimal" placeholder={productos.find((x) => x.id === ajProd)?.vendido_por_peso ? "Stock real en kg" : "Stock real"} value={ajNuevo} onChange={(e) => setAjNuevo(e.target.value)} />
-            <input placeholder="Motivo (ej. conteo, rotura)" value={ajMotivo} maxLength={200} onChange={(e) => setAjMotivo(e.target.value)} />
+            <select value={ajTipo} onChange={(e) => setAjTipo(e.target.value)}>
+              {MOTIVOS_AJUSTE.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+            </select>
+            <input placeholder="Detalle (ej. se cayó una caja)" value={ajMotivo} maxLength={200} onChange={(e) => setAjMotivo(e.target.value)} />
             <button disabled={ocupado || !ajProd || ajNuevo.trim() === "" || ajMotivo.trim().length < 3} onClick={ajustar}>Guardar ajuste</button>
           </div>
           <h3>Últimos movimientos</h3>
@@ -262,7 +315,7 @@ export default function Proveedores({ kiosco, onEtiquetas }: { kiosco: Kiosco; o
               <div className="card" key={h.id}>
                 <div className="row"><b>{h.productos?.nombre ?? "Producto eliminado"}</b>
                   <b style={{ color: h.cantidad > 0 ? "#1e8449" : "#c0392b" }}>{h.cantidad > 0 ? "+" : "−"}{cantidadTexto(Math.abs(h.cantidad), pp)}</b></div>
-                <div className="mut">{fecha(h.created_at)} · {h.tipo === "compra" ? "Compra" : h.tipo === "anulacion_compra" ? "Anulación de compra" : "Ajuste"} · quedó en {cantidadTexto(h.stock_resultante, pp)}{h.motivo ? ` · ${h.motivo}` : ""}</div>
+                <div className="mut">{fecha(h.created_at)} · {h.tipo === "ajuste" ? `Ajuste · ${ETIQUETA_MOTIVO[h.motivo_tipo ?? "manual"] ?? "Manual"}` : (ETIQUETA_TIPO_MOV[h.tipo] ?? h.tipo)} · quedó en {cantidadTexto(h.stock_resultante, pp)}{h.motivo ? ` · ${h.motivo}` : ""}</div>
               </div>
             );
           })}

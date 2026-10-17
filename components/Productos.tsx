@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, type Kiosco, type Producto } from "@/lib/supabase";
 import { aportarAGlobal, buscarPorBarcode, esCodigoValido } from "@/lib/barcode";
 import { peso } from "@/lib/whatsapp";
+import { margenPct } from "@/lib/margen";
 import Escaner from "./Escaner";
 import CargaMasiva from "./CargaMasiva";
 import { BUCKET, comprimirImagen, rutaDeStorage, rutaFoto } from "@/lib/fotos";
@@ -34,7 +35,8 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   const [soloSinStock, setSoloSinStock] = useState(false);
   const [limite, setLimite] = useState(PAGINA);
   const [editId, setEditId] = useState<string | null>(null);
-  const [ed, setEd] = useState({ nombre: "", cat: "", precio: "", controla: false, stock: "", peso: false, plu: "", sinStock: false });
+  const [ed, setEd] = useState({ nombre: "", cat: "", precio: "", controla: false, stock: "", peso: false, plu: "", sinStock: false, minimo: "", objetivo: "", entrega: "3", prov: "" });
+  const [provs, setProvs] = useState<{ id: string; nombre: string }[]>([]);
   const refNombre = useRef<HTMLInputElement>(null);
   const refPrecio = useRef<HTMLInputElement>(null);
 
@@ -43,6 +45,11 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
     if (error) setAviso("No pudimos cargar el catálogo. Revisá la conexión."); else setLista((data ?? []) as Producto[]);
   }, [kiosco.id]);
   useEffect(() => { cargar(); }, [cargar]);
+  // Proveedores activos, para elegir el habitual de cada producto (reposición).
+  useEffect(() => {
+    supabase.from("proveedores").select("id,nombre").eq("kiosco_id", kiosco.id).eq("activo", true).order("nombre")
+      .then(({ data }) => setProvs((data ?? []) as { id: string; nombre: string }[]));
+  }, [kiosco.id]);
 
   const categorias = useMemo(() => Array.from(new Set([...CATS_BASE, ...lista.map((p) => p.categoria)])), [lista]);
   const catsUsadas = useMemo(() => Array.from(new Set(lista.map((p) => p.categoria))), [lista]);
@@ -120,7 +127,7 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
       if (error) setAviso("No se pudo cambiar el precio."); else cargar();
     }
   }
-  function abrirEdicion(p: Producto) { setEditId(editId === p.id ? null : p.id); setEd({ nombre: p.nombre, cat: p.categoria, precio: String(p.precio), controla: !!p.stock_controlado, stock: String(p.stock ?? 0), peso: !!p.vendido_por_peso, plu: p.plu ?? "", sinStock: !!p.permite_sin_stock }); }
+  function abrirEdicion(p: Producto) { setEditId(editId === p.id ? null : p.id); setEd({ nombre: p.nombre, cat: p.categoria, precio: String(p.precio), controla: !!p.stock_controlado, stock: String(p.stock ?? 0), peso: !!p.vendido_por_peso, plu: p.plu ?? "", sinStock: !!p.permite_sin_stock, minimo: String(p.stock_minimo ?? 0), objetivo: p.stock_objetivo == null ? "" : String(p.stock_objetivo), entrega: String(p.lead_time_dias ?? 3), prov: p.proveedor_id ?? "" }); }
   async function guardarEdicion(p: Producto) {
     const n = capitalizar(ed.nombre); const pr = num(ed.precio);
     if (n.length < 2 || isNaN(pr) || pr < 0) { setAviso("Revisá el nombre y el precio."); return; }
@@ -128,8 +135,14 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
     if (ed.controla && (isNaN(st) || st < 0)) { setAviso("El stock tiene que ser un número igual o mayor a cero."); return; }
     const plu = ed.plu.trim();
     if (plu && !/^\d{1,6}$/.test(plu)) { setAviso("El PLU tiene que tener de 1 a 6 números."); return; }
+    // Reposición: mínimo y objetivo en las mismas unidades que el stock (gramos si se vende por peso).
+    const mini = ed.minimo.trim() === "" ? 0 : Math.floor(num(ed.minimo));
+    const obj = ed.objetivo.trim() === "" ? null : Math.floor(num(ed.objetivo));
+    const ent = ed.entrega.trim() === "" ? 3 : Math.floor(num(ed.entrega));
+    if (ed.controla && (isNaN(mini) || mini < 0 || (obj !== null && (isNaN(obj) || obj < 0)))) { setAviso("El stock mínimo y el objetivo tienen que ser números iguales o mayores a cero."); return; }
+    if (ed.controla && (isNaN(ent) || ent < 0 || ent > 60)) { setAviso("Los días de entrega van de 0 a 60."); return; }
     if (ed.peso && !!p.vendido_por_peso !== ed.peso && p.stock_controlado && !confirm("Al pasar a venta por peso el stock se cuenta en GRAMOS. ¿Ya cargaste el stock en gramos?")) return;
-    const { error } = await supabase.from("productos").update({ nombre: n, categoria: capitalizar(ed.cat) || "General", precio: pr, stock_controlado: ed.controla, vendido_por_peso: ed.peso, plu: plu || null, permite_sin_stock: ed.sinStock, ...(ed.controla ? { stock: st, disponible: st > 0 ? true : p.disponible } : {}) }).eq("id", p.id);
+    const { error } = await supabase.from("productos").update({ nombre: n, categoria: capitalizar(ed.cat) || "General", precio: pr, stock_controlado: ed.controla, vendido_por_peso: ed.peso, plu: plu || null, permite_sin_stock: ed.sinStock, ...(ed.controla ? { stock: st, disponible: st > 0 ? true : p.disponible, stock_minimo: mini, stock_objetivo: obj, lead_time_dias: ent, proveedor_id: ed.prov || null } : {}) }).eq("id", p.id);
     if (error) { setAviso("No se pudo guardar el cambio."); return; }
     setEditId(null); setAviso(`Actualizado ✔ ${n}`); cargar();
   }
@@ -220,6 +233,11 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
               <input value={ed.cat} onChange={(e) => setEd({ ...ed, cat: e.target.value })} placeholder="Categoría" list="cats-edit" />
               <datalist id="cats-edit">{categorias.map((c) => <option key={c} value={c} />)}</datalist>
               <input value={ed.precio} onChange={(e) => setEd({ ...ed, precio: e.target.value })} placeholder="Precio" inputMode="decimal" />
+              {p.costo != null && (
+                <p className="mut" style={{ margin: ".2rem 0 .6rem" }}>
+                  Último costo {peso(Number(p.costo))}{margenPct(num(ed.precio), Number(p.costo)) !== null ? ` · margen ${margenPct(num(ed.precio), Number(p.costo))}%` : ""}
+                </p>
+              )}
               <label className="mut" style={{ display: "block", margin: "8px 0" }}>
                 <input type="checkbox" checked={ed.controla} onChange={(e) => setEd({ ...ed, controla: e.target.checked })} style={{ width: "auto", marginRight: 8 }} />Controlar stock por cantidad
               </label>
@@ -228,6 +246,27 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
                 <input type="checkbox" checked={ed.peso} onChange={(e) => setEd({ ...ed, peso: e.target.checked })} style={{ width: "auto", marginRight: 8 }} />Se vende por peso (el precio es por kg)
               </label>
               {ed.peso && <input value={ed.plu} onChange={(e) => setEd({ ...ed, plu: e.target.value })} placeholder="PLU de la balanza (1 a 6 números)" inputMode="numeric" />}
+              {ed.controla && (
+                <div className="card" style={{ margin: "8px 0" }}>
+                  <b>Reposición</b>
+                  <p className="mut" style={{ margin: ".2rem 0 .5rem" }}>Con esto la app te avisa cuándo pedir y cuánto{ed.peso ? " (en gramos, igual que el stock)" : ""}.</p>
+                  <label className="mut">Stock mínimo (avisar cuando baje de acá)
+                    <input value={ed.minimo} onChange={(e) => setEd({ ...ed, minimo: e.target.value })} inputMode="numeric" placeholder="0 = sin mínimo" />
+                  </label>
+                  <label className="mut">Stock objetivo (cuánto querés tener al reponer, opcional)
+                    <input value={ed.objetivo} onChange={(e) => setEd({ ...ed, objetivo: e.target.value })} inputMode="numeric" placeholder="Vacío = lo que se vende en 30 días" />
+                  </label>
+                  <label className="mut">Días que tarda en llegar el pedido
+                    <input value={ed.entrega} onChange={(e) => setEd({ ...ed, entrega: e.target.value })} inputMode="numeric" placeholder="3" />
+                  </label>
+                  <label className="mut">Proveedor habitual
+                    <select value={ed.prov} onChange={(e) => setEd({ ...ed, prov: e.target.value })}>
+                      <option value="">Sin proveedor</option>
+                      {provs.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+                    </select>
+                  </label>
+                </div>
+              )}
               {ed.controla && (
                 <label className="mut" style={{ display: "block", margin: "8px 0" }}>
                   <input type="checkbox" checked={ed.sinStock} onChange={(e) => setEd({ ...ed, sinStock: e.target.checked })} style={{ width: "auto", marginRight: 8 }} />Permitir vender aunque no haya stock en el sistema (en el mostrador)
