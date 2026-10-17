@@ -76,15 +76,16 @@ Límites: el aviso llega si el navegador o la app instalada siguen con permiso; 
 - Panel: pestaña **Proveedores** (Catálogo → Proveedores). Los productos por peso se cargan en kg y se guardan en gramos.
 - Límites conocidos: los pagos a proveedores no mueven la caja del turno (no entran en el arqueo); el historial de stock registra compras, anulaciones y ajustes, no las ventas.
 
-## Fase 3, operación (0024, 0025, 0026)
+## Fase 3, operación (0024 a 0027)
 - `0024_endurecer_funciones.sql`: `search_path` fijo en funciones auxiliares y sin acceso por API a funciones de trigger de fidelidad.
 - `0025_fuga_reglas_lotes.sql` (**aplicar DESPUÉS de 0024**; sin DROP ni DELETE):
   - **Clientes en fuga** (`clientes_en_fuga`): clientes identificados con 3+ compras en el último año y sin comprar hace más de 45 días (parámetros ajustables). La app arma el mensaje; lo envía el dueño por WhatsApp.
   - **Avisos "avisame cuando"** (`avisos_reglas`, `regla_crear`, `reglas_avisos_diarios`): tipos fijos `venta_supera` (ventas de ayer, una vez por día), `fiado_supera` y `stock_bajo_de` (una vez por semana). Lo que no se reconoce no dispara. El cron diario de reposición manda **una** notificación por kiosco con las novedades.
   - **Lotes con vencimiento, FEFO virtual** (`lotes_stock`, `lote_registrar`, `lotes_repartir`, `lote_dar_de_baja`, `lote_cerrar`): el stock actual se reparte desde el lote que vence más tarde hacia atrás (se asume que se vende primero lo que vence antes). La baja solo se permite sobre el lote que vence primero con unidades en stock y queda como ajuste con motivo `vencimiento`. **Nunca cambia precios.**
-  - Test: `supabase/tests/etapa21_test.py` (32 chequeos).
-- `0026_fuga_conteo_semanal.sql` (sin DROP): `fuga_conteo_semanal()` cuenta clientes en fuga por kiosco para el cron. Solo service role (no la puede llamar un usuario logueado).
-- Cron semanal (`/api/cron/fiado`, lunes): además del aviso de fiado vencido, manda un aviso aparte "Clientes que dejaron de venir" a los kioscos con clientes en fuga, con link a Radar. No es idempotente: si el cron se dispara dos veces en la semana, el aviso de fuga se repite.
+  - Test: `supabase/tests/etapa21_test.py` (36 chequeos).
+- `0026_fuga_conteo_semanal.sql` (sin DROP): `fuga_conteo_semanal()` cuenta clientes en fuga por kiosco. Solo service role.
+- `0027_fuga_avisos_semanales.sql` (sin DROP): tabla `avisos_fuga` (RLS, sin acceso para usuarios) y `fuga_avisos_semanales()`, idempotente por kiosco y semana, igual que `avisos_fiado`.
+- Cron semanal (`/api/cron/fiado`, lunes): además del aviso de fiado vencido, manda un aviso aparte "Clientes que dejaron de venir" a los kioscos con clientes en fuga, con link a Radar. Si se dispara dos veces en la semana, no repite ninguno de los dos avisos.
 - Panel "Resumen": dinero parado en mercadería (stock × costo) y **Productos modificados** (`components/ModificadosStock.tsx`): cambios de stock por producto hoy, 7 o 30 días, con diferencia neta y último movimiento. Por defecto oculta ventas, pedidos y devoluciones; hay un tilde para incluirlos. Lee `stock_movimientos` y muestra hasta 1000 movimientos por período.
 - Panel: pestaña **Radar** (grupo Negocio) con Clientes en fuga, Mis avisos y Vencimientos.
 - Carga masiva: columnas `nombre ; precio ; categoría ; código ; stock ; mínimo ; objetivo ; días de entrega ; proveedor`. El proveedor tiene que existir antes.

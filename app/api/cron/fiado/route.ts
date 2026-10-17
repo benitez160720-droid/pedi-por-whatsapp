@@ -37,10 +37,10 @@ export async function GET(req: Request) {
 
   // Plan 3.3: clientes que dejaron de venir (3 compras o más y sin volver hace 45 días). Un aviso aparte por kiosco.
   let fugaAvisados = 0;
-  const { data: fuga, error: errFuga } = await admin.rpc("fuga_conteo_semanal");
+  // Idempotente por kiosco y semana (tabla avisos_fuga): una segunda corrida en la misma semana no devuelve nada.
+  const { data: fuga, error: errFuga } = await admin.rpc("fuga_avisos_semanales");
   if (!errFuga) {
     for (const f of (fuga ?? []) as Fuga[]) {
-      if (f.clientes <= 0) continue;
       fugaAvisados++;
       await enviarAKiosco(admin, f.kiosco, armarAvisoFuga({ clientes: Number(f.clientes), dias: 45 }), contar);
     }

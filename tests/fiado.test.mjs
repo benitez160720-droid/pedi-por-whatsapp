@@ -8,8 +8,8 @@ const eq = (n, a, b) => { const ok = JSON.stringify(a) === JSON.stringify(b); if
 eq("aviso plural", F.armarAvisoFiado({ clientes: 3, monto: 12500.4, dias: 30 }).body, "3 clientes deben $12.500 hace más de 30 días");
 eq("aviso singular", F.armarAvisoFiado({ clientes: 1, monto: 1000, dias: 30 }).body, "1 cliente debe $1.000 hace más de 30 días");
 eq("aviso lleva al fiado", F.armarAvisoFiado({ clientes: 1, monto: 1, dias: 30 }).url, "/panel?tab=fiado");
-console.log(fallos ? `\n${fallos} FALLAS` : "\nfiado: todo OK");
-process.exit(fallos ? 1 : 0);
 eq("aviso fuga plural", F.armarAvisoFuga({ clientes: 2, dias: 45 }).body, "2 clientes no compran hace más de 45 días");
 eq("aviso fuga singular", F.armarAvisoFuga({ clientes: 1, dias: 45 }).body, "1 cliente no compra hace más de 45 días");
 eq("aviso fuga lleva al radar", F.armarAvisoFuga({ clientes: 1, dias: 45 }).url, "/panel?tab=radar");
+console.log(fallos ? `\n${fallos} FALLAS` : "\nfiado: todo OK");
+process.exit(fallos ? 1 : 0);

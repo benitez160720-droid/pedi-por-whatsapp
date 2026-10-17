@@ -30,7 +30,7 @@ grant usage on schema storage to anon, authenticated;
 grant all on storage.objects to anon, authenticated;
 create publication supabase_realtime;
 """)
-for m in ["0001_init", "0002_fiado_sellos_precios", "0003_endurecer_permisos", "0004_operacion_kiosco", "0005_pedido_a_fiado", "0006_cierre_etapa3", "0007_borrar_cliente", "0008_push", "0009_stock", "0010_caja", "0011_mostrador", "0012_pos", "0013_pos_avanzado", "0014_pin_opciones", "0015_proveedores_compras", "0016_etiquetas", "0017_fidelidad", "0018_reposicion", "0019_motivos_mermas", "0020_historial_stock", "0021_conteo_planilla", "0022_margen_precios", "0023_fase3_abc_fiado", "0024_endurecer_funciones", "0025_fuga_reglas_lotes", "0026_fuga_conteo_semanal"]:
+for m in ["0001_init", "0002_fiado_sellos_precios", "0003_endurecer_permisos", "0004_operacion_kiosco", "0005_pedido_a_fiado", "0006_cierre_etapa3", "0007_borrar_cliente", "0008_push", "0009_stock", "0010_caja", "0011_mostrador", "0012_pos", "0013_pos_avanzado", "0014_pin_opciones", "0015_proveedores_compras", "0016_etiquetas", "0017_fidelidad", "0018_reposicion", "0019_motivos_mermas", "0020_historial_stock", "0021_conteo_planilla", "0022_margen_precios", "0023_fase3_abc_fiado", "0024_endurecer_funciones", "0025_fuga_reglas_lotes", "0026_fuga_conteo_semanal", "0027_fuga_avisos_semanales"]:
     cur.execute(open(f"supabase/migrations/{m}.sql").read())
 A, B = str(uuid.uuid4()), str(uuid.uuid4())
 cur.execute("insert into auth.users values (%s),(%s)", (A, B))
@@ -163,6 +163,17 @@ n_b = len(rows("select * from clientes_en_fuga(%s, 45, 3)", (kb,)))
 cur.execute("reset role")  # el cron usa service role: se consulta como root
 conteo = {r["kiosco"]: r["clientes"] for r in rows("select * from fuga_conteo_semanal()")}
 ok(conteo.get(kb, 0) == n_b, f"el conteo de otro kiosco también coincide con su dueño ({n_b})")
+
+# 0027: aviso de fuga idempotente por kiosco y semana.
+as_("authenticated", A)
+ok(has(fails("select * from avisos_fuga"), "permission denied"), "la tabla de avisos de fuga no es legible por usuarios logueados")
+as_("authenticated", A)
+cur.execute("reset role")
+primera = rows("select * from fuga_avisos_semanales()")
+ok(all(r["clientes"] > 0 for r in primera), "la primera corrida devuelve solo kioscos con clientes en fuga")
+ok(sum(1 for r in primera if r["kiosco"] == ka) == (1 if conteo.get(ka, 0) > 0 else 0), "el kiosco A aparece en la primera corrida si tiene fuga")
+segunda = rows("select * from fuga_avisos_semanales()")
+ok(segunda == [], "la segunda corrida de la misma semana no repite ningún aviso")
 
 cur.execute("rollback")
 print("TODO OK" if bad == 0 else f"{bad} FALLAS")
