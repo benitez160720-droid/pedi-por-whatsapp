@@ -709,7 +709,14 @@ button.pos-x { min-height: 34px; width: 34px; padding: 0; border-radius: 50%; }
 @media print {
   body * { visibility: hidden !important; }
   #ticket-imprimible, #ticket-imprimible * { visibility: visible !important; }
-  #ticket-imprimible { position: absolute; left: 0; top: 0; width: 80mm; padding: 2mm; }
+  #ticket-imprimible { position: absolute; left: 0; top: 0; width: 58mm; padding: 2mm; }
+  #ticket-imprimible[data-ancho="80"] { width: 80mm; }
   .no-print { display: none !important; }
   body { background: #fff !important; }
 }
+
+/* POS avanzado: promos, descuento por renglón y aviso sin conexión */
+.pos-promo { color: var(--ok); font-weight: 600; }
+.pos-dto-linea input { font: 500 .8rem var(--f-mono); }
+.pos-offline { margin: .5rem 0; padding: .6rem .9rem; background: var(--warn-bg); border: 1px solid var(--warn); color: var(--ink); }
+.pos-offline .pos-error { margin: .4rem 0 0; }

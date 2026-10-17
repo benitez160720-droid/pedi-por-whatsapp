@@ -34,7 +34,7 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
   const [soloSinStock, setSoloSinStock] = useState(false);
   const [limite, setLimite] = useState(PAGINA);
   const [editId, setEditId] = useState<string | null>(null);
-  const [ed, setEd] = useState({ nombre: "", cat: "", precio: "", controla: false, stock: "" });
+  const [ed, setEd] = useState({ nombre: "", cat: "", precio: "", controla: false, stock: "", peso: false, plu: "", sinStock: false });
   const refNombre = useRef<HTMLInputElement>(null);
   const refPrecio = useRef<HTMLInputElement>(null);
 
@@ -120,13 +120,16 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
       if (error) setAviso("No se pudo cambiar el precio."); else cargar();
     }
   }
-  function abrirEdicion(p: Producto) { setEditId(editId === p.id ? null : p.id); setEd({ nombre: p.nombre, cat: p.categoria, precio: String(p.precio), controla: !!p.stock_controlado, stock: String(p.stock ?? 0) }); }
+  function abrirEdicion(p: Producto) { setEditId(editId === p.id ? null : p.id); setEd({ nombre: p.nombre, cat: p.categoria, precio: String(p.precio), controla: !!p.stock_controlado, stock: String(p.stock ?? 0), peso: !!p.vendido_por_peso, plu: p.plu ?? "", sinStock: !!p.permite_sin_stock }); }
   async function guardarEdicion(p: Producto) {
     const n = capitalizar(ed.nombre); const pr = num(ed.precio);
     if (n.length < 2 || isNaN(pr) || pr < 0) { setAviso("Revisá el nombre y el precio."); return; }
     const st = Math.floor(num(ed.stock));
     if (ed.controla && (isNaN(st) || st < 0)) { setAviso("El stock tiene que ser un número igual o mayor a cero."); return; }
-    const { error } = await supabase.from("productos").update({ nombre: n, categoria: capitalizar(ed.cat) || "General", precio: pr, stock_controlado: ed.controla, ...(ed.controla ? { stock: st, disponible: st > 0 ? true : p.disponible } : {}) }).eq("id", p.id);
+    const plu = ed.plu.trim();
+    if (plu && !/^\d{1,6}$/.test(plu)) { setAviso("El PLU tiene que tener de 1 a 6 números."); return; }
+    if (ed.peso && !!p.vendido_por_peso !== ed.peso && p.stock_controlado && !confirm("Al pasar a venta por peso el stock se cuenta en GRAMOS. ¿Ya cargaste el stock en gramos?")) return;
+    const { error } = await supabase.from("productos").update({ nombre: n, categoria: capitalizar(ed.cat) || "General", precio: pr, stock_controlado: ed.controla, vendido_por_peso: ed.peso, plu: plu || null, permite_sin_stock: ed.sinStock, ...(ed.controla ? { stock: st, disponible: st > 0 ? true : p.disponible } : {}) }).eq("id", p.id);
     if (error) { setAviso("No se pudo guardar el cambio."); return; }
     setEditId(null); setAviso(`Actualizado ✔ ${n}`); cargar();
   }
@@ -220,7 +223,16 @@ export default function Productos({ kiosco }: { kiosco: Kiosco }) {
               <label className="mut" style={{ display: "block", margin: "8px 0" }}>
                 <input type="checkbox" checked={ed.controla} onChange={(e) => setEd({ ...ed, controla: e.target.checked })} style={{ width: "auto", marginRight: 8 }} />Controlar stock por cantidad
               </label>
-              {ed.controla && <input value={ed.stock} onChange={(e) => setEd({ ...ed, stock: e.target.value })} placeholder="Cantidad disponible" inputMode="numeric" />}
+              {ed.controla && <input value={ed.stock} onChange={(e) => setEd({ ...ed, stock: e.target.value })} placeholder={ed.peso ? "Stock en gramos (ej. 5000 = 5 kg)" : "Cantidad disponible"} inputMode="numeric" />}
+              <label className="mut" style={{ display: "block", margin: "8px 0" }}>
+                <input type="checkbox" checked={ed.peso} onChange={(e) => setEd({ ...ed, peso: e.target.checked })} style={{ width: "auto", marginRight: 8 }} />Se vende por peso (el precio es por kg)
+              </label>
+              {ed.peso && <input value={ed.plu} onChange={(e) => setEd({ ...ed, plu: e.target.value })} placeholder="PLU de la balanza (1 a 6 números)" inputMode="numeric" />}
+              {ed.controla && (
+                <label className="mut" style={{ display: "block", margin: "8px 0" }}>
+                  <input type="checkbox" checked={ed.sinStock} onChange={(e) => setEd({ ...ed, sinStock: e.target.checked })} style={{ width: "auto", marginRight: 8 }} />Permitir vender aunque no haya stock en el sistema (en el mostrador)
+                </label>
+              )}
               <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", margin: "0 0 10px" }}>
                 <label className="btn sec" aria-busy={subiendo === p.id}>
                   {subiendo === p.id ? "Subiendo…" : p.imagen_url ? "📷 Cambiar foto" : "📷 Agregar foto"}

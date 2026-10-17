@@ -1,16 +1,16 @@
 "use client";
 import { useEffect } from "react";
-import { ETIQUETA_MEDIO, type ItemVenta, type PagoVenta } from "@/lib/caja";
+import { ETIQUETA_MEDIO, cantidadTexto, type ItemVenta, type PagoVenta } from "@/lib/caja";
 import { peso } from "@/lib/whatsapp";
 
 export type TicketData = {
   numero: number; fecha: string; kioscoNombre: string; cliente: string | null;
   items: ItemVenta[]; subtotal: number; descuento: number; descuentoPct?: number; total: number;
-  pagos: PagoVenta[]; vuelto: number; anulada?: boolean;
+  pagos: PagoVenta[]; vuelto: number; anulada?: boolean; pendiente?: boolean; encabezado?: string | null; pie?: string | null;
 };
 
 // Ticket en pantalla y para impresora térmica (window.print). Enter cierra, P imprime.
-export default function Ticket({ t, onCerrar }: { t: TicketData; onCerrar: () => void }) {
+export default function Ticket({ t, onCerrar, ancho = 58 }: { t: TicketData; onCerrar: () => void; ancho?: 58 | 80 }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onCerrar(); }
@@ -22,17 +22,18 @@ export default function Ticket({ t, onCerrar }: { t: TicketData; onCerrar: () =>
   return (
     <div className="pos-overlay" role="dialog" aria-modal="true" aria-label={`Ticket ${t.numero}`}>
       <div className="pos-modal pos-modal--ticket">
-        <div className="ticket-print" id="ticket-imprimible">
+        <div className="ticket-print" id="ticket-imprimible" data-ancho={ancho}>
           <div className="ticket-cab">
             <b>{t.kioscoNombre}</b>
-            <span>Ticket N° {t.numero}</span>
+            {t.encabezado && <span>{t.encabezado}</span>}
+            <span>{t.pendiente ? "Venta sin conexión (se envía al reconectar)" : `Ticket N° ${t.numero}`}</span>
             <span>{t.fecha}</span>
             <span>Cliente: {t.cliente ?? "Consumidor final"}</span>
             {t.anulada && <b className="ticket-anulado">ANULADO</b>}
           </div>
           <div className="ticket-items">
             {t.items.map((i, k) => (
-              <div className="ticket-linea" key={k}><span>{i.cantidad} × {i.nombre}</span><span>{peso(i.cantidad * i.precio_unit)}</span></div>
+              <div className="ticket-linea" key={k}><span>{cantidadTexto(i.cantidad, i.por_peso)} × {i.nombre}</span><span>{peso(i.importe ?? (i.por_peso ? (i.cantidad * i.precio_unit) / 1000 : i.cantidad * i.precio_unit))}</span></div>
             ))}
           </div>
           <div className="ticket-tot">
@@ -44,7 +45,7 @@ export default function Ticket({ t, onCerrar }: { t: TicketData; onCerrar: () =>
             {t.pagos.map((p, k) => (<div className="ticket-linea" key={k}><span>{ETIQUETA_MEDIO[p.medio]}</span><span>{peso(p.monto)}</span></div>))}
             {t.vuelto > 0 && <div className="ticket-linea"><span>Vuelto</span><span>{peso(t.vuelto)}</span></div>}
           </div>
-          <p className="ticket-gracias">¡Gracias por su compra!</p>
+          <p className="ticket-gracias">{t.pie || "¡Gracias por su compra!"}</p>
         </div>
         <div className="pos-modal-acciones no-print">
           <button className="sec" onClick={onCerrar}>Cerrar <kbd>Enter</kbd></button>

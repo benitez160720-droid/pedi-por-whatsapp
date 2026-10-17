@@ -1,12 +1,14 @@
 "use client";
 import { useMemo, useState } from "react";
 import { supabase, type Kiosco } from "@/lib/supabase";
-import { ETIQUETA_MEDIO, fecha, hora, mensajeError, MEDIOS, type Resumen, type Venta } from "@/lib/caja";
+import { ETIQUETA_MEDIO, cantidadTexto, fecha, hora, mensajeError, MEDIOS, necesitaPin, type PosConfig, type Resumen, type Venta } from "@/lib/caja";
 import { peso } from "@/lib/whatsapp";
 import Ticket, { type TicketData } from "./Ticket";
+import DevolverModal from "./DevolverModal";
+import { usePin } from "./PinModal";
 
 // Ventas del turno: buscar, ver ticket, reimprimir y anular con motivo.
-export default function VentasTurno({ kiosco, resumen, abierto, onCambio }: { kiosco: Kiosco; resumen: Resumen; abierto: boolean; onCambio: () => void }) {
+export default function VentasTurno({ kiosco, resumen, abierto, config, onCambio }: { kiosco: Kiosco; resumen: Resumen; abierto: boolean; config: PosConfig; onCambio: () => void }) {
   const [q, setQ] = useState("");
   const [estado, setEstado] = useState<"" | "completada" | "anulada">("");
   const [anulando, setAnulando] = useState<Venta | null>(null);
@@ -14,6 +16,8 @@ export default function VentasTurno({ kiosco, resumen, abierto, onCambio }: { ki
   const [err, setErr] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [ticket, setTicket] = useState<TicketData | null>(null);
+  const [devolviendo, setDevolviendo] = useState<Venta | null>(null);
+  const { pedir, modal: modalPin } = usePin(kiosco.id);
 
   const lista = useMemo(() => resumen.ventas.filter((v) => {
     if (estado === "anulada" && !v.anulada) return false;
@@ -31,10 +35,26 @@ export default function VentasTurno({ kiosco, resumen, abierto, onCambio }: { ki
 
   async function anular() {
     if (!anulando) return;
-    setOcupado(true); setErr("");
-    const { error } = await supabase.rpc("anular_venta_mostrador", { p_venta: anulando.id, p_motivo: motivo });
-    setOcupado(false);
-    if (error) return setErr(mensajeError(error.message));
+    setErr("");
+    const llamar = async (token: string | null) => {
+      setOcupado(true);
+      const r = await supabase.rpc("anular_venta_mostrador", { p_venta: anulando.id, p_motivo: motivo, p_token: token });
+      setOcupado(false);
+      return r;
+    };
+    let token: string | null = null;
+    if (necesitaPin(config, "anular")) {
+      const t = await pedir(`Anular la venta #${anulando.numero}`);
+      if (t === undefined) return;
+      token = t;
+    }
+    let r = await llamar(token);
+    if (r.error?.message.includes("pin_requerido") && token === null) {
+      const t = await pedir(`Anular la venta #${anulando.numero}`);
+      if (t === undefined) return;
+      r = await llamar(t);
+    }
+    if (r.error) return setErr(r.error.message.includes("pin_requerido") ? "El PIN venció (dura 2 minutos). Probá de nuevo." : mensajeError(r.error.message));
     setAnulando(null); setMotivo(""); onCambio();
   }
 
@@ -59,7 +79,7 @@ export default function VentasTurno({ kiosco, resumen, abierto, onCambio }: { ki
             <b className="mono">{peso(v.total)}</b>
           </summary>
           <div className="recibo">
-            {v.items.map((i, k) => (<div className="row" key={k}><span>{i.cantidad} × {i.nombre}</span><span className="mono">{peso(i.cantidad * i.precio_unit)}</span></div>))}
+            {v.items.map((i, k) => (<div className="row" key={k}><span>{cantidadTexto(i.cantidad, i.por_peso)} × {i.nombre}</span><span className="mono">{peso(i.por_peso ? (i.cantidad * i.precio_unit) / 1000 : i.cantidad * i.precio_unit)}</span></div>))}
             {v.descuento > 0 && <div className="row"><span>Descuento</span><span className="mono">−{peso(v.descuento)}</span></div>}
             {v.pagos.map((p, k) => (<div className="row mut" key={k}><span>{ETIQUETA_MEDIO[p.medio]}</span><span className="mono">{peso(p.monto)}</span></div>))}
             {v.vuelto > 0 && <div className="row mut"><span>Vuelto</span><span className="mono">{peso(v.vuelto)}</span></div>}
@@ -67,11 +87,23 @@ export default function VentasTurno({ kiosco, resumen, abierto, onCambio }: { ki
           {v.anulada && v.anulada_motivo && <p className="mut">Motivo: {v.anulada_motivo}</p>}
           <div className="pos-venta-acc">
             <button className="sec" onClick={() => verTicket(v)}>Ver ticket</button>
+            {!v.anulada && abierto && <button className="sec" onClick={() => setDevolviendo(v)}>Devolver</button>}
             {!v.anulada && abierto && <button className="sec peligro" onClick={() => { setAnulando(v); setMotivo(""); setErr(""); }}>Anular venta</button>}
           </div>
         </details>
       ))}
-      {!abierto && <p className="mut">La caja está cerrada: las ventas ya no se pueden anular.</p>}
+      {resumen.devoluciones.length > 0 && (
+        <div className="card" style={{ marginTop: ".8rem" }}>
+          <h3 className="pos-sub" style={{ marginTop: 0 }}>Devoluciones del turno</h3>
+          {resumen.devoluciones.map((d) => (
+            <div className="row" key={d.id}>
+              <span><b className="mono">D-{d.numero}</b> <span className="mut">venta #{d.venta_numero} · {hora(d.created_at)} · {ETIQUETA_MEDIO[d.medio]} · {d.motivo}</span></span>
+              <b className="mono">−{peso(d.total)}</b>
+            </div>
+          ))}
+        </div>
+      )}
+      {!abierto && <p className="mut">La caja está cerrada: las ventas ya no se pueden anular ni devolver.</p>}
       {anulando && (
         <div className="pos-overlay" role="dialog" aria-modal="true" aria-label="Anular venta">
           <div className="pos-modal">
@@ -88,6 +120,8 @@ export default function VentasTurno({ kiosco, resumen, abierto, onCambio }: { ki
         </div>
       )}
       {ticket && <Ticket t={ticket} onCerrar={() => setTicket(null)} />}
+      {devolviendo && <DevolverModal kiosco={kiosco} ventaId={devolviendo.id} numero={devolviendo.numero} config={config} onCerrar={() => setDevolviendo(null)} onHecho={onCambio} />}
+      {modalPin}
     </div>
   );
 }
