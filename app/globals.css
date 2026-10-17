@@ -720,3 +720,23 @@ button.pos-x { min-height: 34px; width: 34px; padding: 0; border-radius: 50%; }
 .pos-dto-linea input { font: 500 .8rem var(--f-mono); }
 .pos-offline { margin: .5rem 0; padding: .6rem .9rem; background: var(--warn-bg); border: 1px solid var(--warn); color: var(--ink); }
 .pos-offline .pos-error { margin: .4rem 0 0; }
+
+/* ------------------------------- Etiquetas de precio ------------------- */
+.etq-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .5rem; margin: .4rem 0; }
+.etq-check { display: flex; align-items: center; gap: .5rem; text-transform: none; letter-spacing: 0; font: 500 .9rem var(--f-body, inherit); }
+.etq-check input { width: auto; }
+.etq-grilla { display: grid; justify-content: start; overflow-x: auto; background: #fff; color: #000; border: 1px solid var(--line); border-radius: 4px; margin-top: .5rem; }
+.etq-grilla:empty { display: none; }
+.etq-item { box-sizing: border-box; border: 1px dashed #bbb; padding: 1.5mm; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; text-align: center; font-family: Arial, Helvetica, sans-serif; break-inside: avoid; }
+.etq-nombre { font-size: 8.5px; font-weight: 600; line-height: 1.1; max-height: 2.2em; overflow: hidden; width: 100%; }
+.etq-precio { font-size: 15px; font-weight: 700; margin: .5mm 0; }
+.etq-regular { font-size: 9px; color: #555; text-decoration: line-through; margin-top: .5mm; }
+.etq-promo { color: #b00020; font-size: 16px; }
+.etq-leyenda { font-size: 8px; font-weight: 700; }
+.etq-barras { width: 90%; }
+.etq-num { font-size: 7px; letter-spacing: .5px; }
+@media print {
+  #etiquetas-imprimible, #etiquetas-imprimible * { visibility: visible !important; }
+  #etiquetas-imprimible { position: absolute; left: 0; top: 0; border: 0; border-radius: 0; margin: 0; overflow: visible; }
+  #etiquetas-imprimible .etq-item { border: none; }
+}
