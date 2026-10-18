@@ -61,7 +61,7 @@ export default function Precios({ kiosco }: { kiosco: Kiosco }) {
     const { data, error } = await supabase.rpc("ajustar_precios", args);
     setOcupado(false);
     if (error) { setMsg("No se pudo aplicar el ajuste."); return; }
-    setMsg(`Listo: ${data.cantidad} precios actualizados ✔`); setPct(""); setPrev(null); setPaso(1); await cargar();
+    setMsg(`Listo: ${data.cantidad} precios actualizados`); setPct(""); setPrev(null); setPaso(1); await cargar();
   }
 
   async function previsualizarMargen() {
@@ -79,7 +79,7 @@ export default function Precios({ kiosco }: { kiosco: Kiosco }) {
     const { data, error } = await supabase.rpc("ajustar_precios_por_margen", { p_kiosco: kiosco.id, p_margen: objNum, p_categoria: cat || null, p_redondeo: red });
     setOcupado(false);
     if (error) { setMsgM("No se pudo aplicar el ajuste."); return; }
-    setMsgM(`Listo: ${data.cantidad} precios actualizados ✔`); setPrevM(null); cargar();
+    setMsgM(`Listo: ${data.cantidad} precios actualizados`); setPrevM(null); cargar();
   }
 
   const bajos = productosMargenBajo(prods, objOk ? objNum : 0);

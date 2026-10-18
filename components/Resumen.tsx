@@ -43,7 +43,7 @@ export default function Resumen({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: "p
       <div className="card row">
         <span>Tu tienda: <b>/{kiosco.slug}</b></span>
         <span className="acciones">
-          <button type="button" onClick={copiarLink}>{copiado ? "Link copiado ✔" : "Copiar link"}</button>
+          <button type="button" onClick={copiarLink}>{copiado ? "Link copiado" : "Copiar link"}</button>
           <button type="button" className="sec" onClick={() => onIr("local")}>Ver QR</button>
         </span>
       </div>

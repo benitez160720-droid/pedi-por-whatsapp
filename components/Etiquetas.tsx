@@ -74,7 +74,7 @@ export default function Etiquetas({ kiosco, precarga, onPrecargaUsada }: { kiosc
     setOcupado(true); setMsg("");
     const { error } = await supabase.from("config_etiquetas").upsert({ kiosco_id: kiosco.id, ...config, updated_at: new Date().toISOString() });
     setOcupado(false);
-    setMsg(error ? "No pudimos guardar la configuración." : "Configuración guardada ✔");
+    setMsg(error ? "No pudimos guardar la configuración." : "Configuración guardada");
   }
 
   const elegidos = useMemo(() => new Set(sel.map((s) => s.producto_id)), [sel]);

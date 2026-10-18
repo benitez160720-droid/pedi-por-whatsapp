@@ -35,7 +35,7 @@ export default function FidelidadCaja({ kiosco, cliente, aplicado, pct, descuent
       <p className="mut pos-saldo" style={{ margin: ".3rem 0 0" }}>Sellos: <b>{saldo}</b>{!aplicado && proximo ? ` · faltan ${proximo.costo_sellos - saldo} para “${proximo.nombre}”` : ""}</p>
       {aplicado ? (
         <div className="row" style={{ marginTop: 6 }}>
-          <span>🎁 <b>{aplicado.nombre}</b> <span className="mut">({aplicado.costo_sellos} sellos){aplicado.tipo === "libre" ? " · entregalo al cliente" : descuento > 0 ? ` · −${peso(descuento)} (${pct}%)` : ""}</span></span>
+          <span><b>{aplicado.nombre}</b> <span className="mut">({aplicado.costo_sellos} sellos){aplicado.tipo === "libre" ? " · entregalo al cliente" : descuento > 0 ? ` · −${peso(descuento)} (${pct}%)` : ""}</span></span>
           <button type="button" className="sec" onClick={onQuitar}>Quitar</button>
         </div>
       ) : disponibles.length > 0 && (

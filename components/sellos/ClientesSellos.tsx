@@ -60,7 +60,7 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
     setMsg("");
     const { error } = await supabase.rpc("fidelidad_dar_sellos", { p_cliente: c.id, p_campana: campana, p_cantidad: cant ?? null, p_motivo: motivo ?? null });
     if (error) { setMsg(mensajeFidelidad(error.message)); return false; }
-    setMsg("Puntos actualizados ✔"); await refrescar(c.id); return true;
+    setMsg("Puntos actualizados"); await refrescar(c.id); return true;
   }
   async function sumarPorTelefono() {
     setMsg("");
@@ -75,12 +75,12 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
       ? { p_cliente: c!.id, p_campana: accion, p_cantidad: null, p_motivo: null }
       : { p_cliente: c!.id, p_campana: null, p_cantidad: 1, p_motivo: "Sello en mostrador" });
     if (error) return setMsg(mensajeFidelidad(error.message));
-    setTel(""); setNombre(""); setMsg("Punto sumado ✔"); void cargar();
+    setTel(""); setNombre(""); setMsg("Punto sumado"); void cargar();
   }
   async function canjear(c: Cli, p: Premio) {
     if (!await confirmar({ titulo: `¿Canjear "${p.nombre}" para ${c.nombre}? Se descuentan ${p.costo_sellos} puntos.${p.tipo === "libre" ? "" : " El descuento o producto lo aplicás vos en la venta (o canjealo directo desde la Caja)."}`, confirmar: "Sí, seguir", peligro: false })) return;
     const { error } = await supabase.rpc("fidelidad_canjear", { p_cliente: c.id, p_premio: p.id });
-    setMsg(error ? mensajeFidelidad(error.message) : "Premio canjeado ✔"); await refrescar(c.id);
+    setMsg(error ? mensajeFidelidad(error.message) : "Premio canjeado"); await refrescar(c.id);
   }
   async function alternarSello(c: Cli, m: Mov) {
     const { error } = await supabase.rpc("fidelidad_anular_sello", { p_sello: m.sello_id, p_anular: !m.anulado });
@@ -89,7 +89,7 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
   async function anularCanje(c: Cli, m: Mov) {
     if (!await confirmar({ titulo: "¿Anular este canje? Los puntos vuelven al cliente.", confirmar: "Sí, seguir", peligro: true })) return;
     const { error } = await supabase.rpc("fidelidad_anular_canje", { p_canje: m.canje_id });
-    setMsg(error ? mensajeFidelidad(error.message) : "Canje anulado ✔"); await refrescar(c.id);
+    setMsg(error ? mensajeFidelidad(error.message) : "Canje anulado"); await refrescar(c.id);
   }
   async function aplicarAjuste(c: Cli) {
     if (!ajuste) return;
@@ -122,7 +122,7 @@ export default function ClientesSellos({ kiosco, campanas, premios }: { kiosco: 
         return (
           <div className="card" key={c.id}>
             <div className="row" onClick={() => abrir(c.id)} style={{ cursor: "pointer" }}>
-              <b>{c.nombre}</b><b>{c.sellos_disponibles} sello{c.sellos_disponibles === 1 ? "" : "s"}{canjeables.length ? " 🎁" : ""}</b>
+              <b>{c.nombre}</b><b>{c.sellos_disponibles} sello{c.sellos_disponibles === 1 ? "" : "s"}{canjeables.length ? " · premio listo" : ""}</b>
             </div>
             {proximo && <p className="mut" style={{ margin: ".3rem 0 0" }}>Le faltan {proximo.costo_sellos - c.sellos_disponibles} para “{proximo.nombre}”.</p>}
             {c.vence_at && c.sellos_disponibles > 0 && <p className="mut" style={{ margin: ".2rem 0 0" }}>Vencen el {fecha(c.vence_at)} si no vuelve a sumar.</p>}

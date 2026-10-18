@@ -97,7 +97,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
     const { error } = await supabase.rpc("proveedor_guardar", { p_kiosco: kiosco.id, p_id: form.id ?? null, p_nombre: form.nombre, p_telefono: form.telefono, p_cuit: form.cuit, p_notas: form.notas, p_activo: true });
     setOcupado(false);
     if (error) return setMsg(mensajeCompras(error.message));
-    setForm(null); setMsg("Proveedor guardado ✔"); await cargar();
+    setForm(null); setMsg("Proveedor guardado"); await cargar();
   }
   async function pagar(p: Proveedor) {
     const m = num(pagoMonto);
@@ -106,7 +106,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
     const { error } = await supabase.rpc("pagar_proveedor", { p_kiosco: kiosco.id, p_proveedor: p.id, p_monto: m, p_medio: pagoMedio, p_nota: null });
     setOcupado(false);
     if (error) return setMsg(mensajeCompras(error.message));
-    setPagoMonto(""); setMsg("Pago registrado ✔"); await refrescar(p.id);
+    setPagoMonto(""); setMsg("Pago registrado"); await refrescar(p.id);
   }
 
   const prodSel = productos.find((p) => p.id === selProd);
@@ -143,13 +143,13 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
     // Una etiqueta por unidad comprada (por peso: una sola, el precio es por kg).
     setUltima(lineas.map((l) => ({ producto_id: l.producto_id, copias: l.por_peso ? 1 : Math.min(l.cantidad, 999) })));
     setComprando(null); setLineas([]);
-    setMsg(`Compra #${data?.numero ?? ""} registrada ✔ Stock actualizado.`); await refrescar(p.id);
+    setMsg(`Compra #${data?.numero ?? ""} registrada. Stock actualizado.`); await refrescar(p.id);
   }
   async function anular(p: Proveedor, c: Compra) {
     if (!await confirmar({ titulo: `¿Anular la compra #${c.numero}? Se resta el stock que sumó y se borra su deuda.`, confirmar: "Sí, seguir", peligro: true })) return;
     const { error } = await supabase.rpc("anular_compra", { p_compra: c.id });
     if (error) return setMsg(mensajeCompras(error.message));
-    setMsg("Compra anulada ✔"); await refrescar(p.id);
+    setMsg("Compra anulada"); await refrescar(p.id);
   }
 
   async function ajustar() {
@@ -162,7 +162,7 @@ export default function Proveedores({ kiosco, onEtiquetas, precarga, onPrecargaU
     const { error } = await supabase.rpc("ajustar_stock", { p_producto: pr.id, p_nuevo: nuevo, p_motivo: ajMotivo, p_tipo: ajTipo });
     setOcupado(false);
     if (error) return setMsg(mensajeCompras(error.message));
-    setAjProd(""); setAjNuevo(""); setAjMotivo(""); setAjTipo("manual"); setMsg("Stock ajustado ✔"); await Promise.all([cargar(), cargarHistorial(), cargarMermas()]);
+    setAjProd(""); setAjNuevo(""); setAjMotivo(""); setAjTipo("manual"); setMsg("Stock ajustado"); await Promise.all([cargar(), cargarHistorial(), cargarMermas()]);
   }
 
   const deuda = lista.filter((p) => p.saldo > 0).reduce((s, p) => s + p.saldo, 0);

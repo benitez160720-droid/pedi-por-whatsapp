@@ -57,7 +57,7 @@ export default function PedidosProveedor({ kiosco, refresco, onComprar }: { kios
     setOcupado(false);
     setLlego({ proveedorId: p.proveedor_id, lineas: lineasParaCompra(p.items, r.payload, costos) });
     setRecibiendo(null); setTextos({});
-    setMsg("Recepción registrada ✔ Falta cargar la compra para que entre el stock.");
+    setMsg("Recepción registrada. Falta cargar la compra para que entre el stock.");
     await cargar();
   }
 
@@ -105,12 +105,12 @@ export default function PedidosProveedor({ kiosco, refresco, onComprar }: { kios
         <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
           {a.enviar && tel && (
             <a className="btn" href={linkWhatsApp(tel, mensajePedidoProveedor(kiosco.nombre, prov?.nombre ?? "", p.items.map((i) => ({ nombre: i.nombre, por_peso: i.por_peso, cantidad: i.cantidad }))))}
-              target="_blank" rel="noopener" onClick={() => void accion("pedido_proveedor_enviar", p.id, "Pedido marcado como enviado ✔")}>Enviar por WhatsApp</a>
+              target="_blank" rel="noopener" onClick={() => void accion("pedido_proveedor_enviar", p.id, "Pedido marcado como enviado")}>Enviar por WhatsApp</a>
           )}
-          {a.enviar && <button className="sec" disabled={ocupado} onClick={() => accion("pedido_proveedor_enviar", p.id, "Pedido marcado como enviado ✔")}>Marcar como enviado</button>}
+          {a.enviar && <button className="sec" disabled={ocupado} onClick={() => accion("pedido_proveedor_enviar", p.id, "Pedido marcado como enviado")}>Marcar como enviado</button>}
           {a.recibir && recibiendo !== p.id && <button disabled={ocupado} onClick={() => { setRecibiendo(p.id); setTextos({}); setMsg(""); }}>Registrar lo que llegó</button>}
-          {a.cerrar && <button className="sec" disabled={ocupado} onClick={async () => { if (await confirmar({ titulo: "¿Dar por cerrado el pedido? Lo que no llegó ya no se espera.", confirmar: "Sí, seguir", peligro: true })) void accion("pedido_proveedor_cerrar", p.id, "Pedido cerrado ✔"); }}>Cerrar sin lo que falta</button>}
-          {a.cancelar && <button className="sec" disabled={ocupado} onClick={async () => { if (await confirmar({ titulo: "¿Cancelar este pedido?", confirmar: "Sí, seguir", peligro: true })) void accion("pedido_proveedor_cancelar", p.id, "Pedido cancelado ✔"); }}>Cancelar pedido</button>}
+          {a.cerrar && <button className="sec" disabled={ocupado} onClick={async () => { if (await confirmar({ titulo: "¿Dar por cerrado el pedido? Lo que no llegó ya no se espera.", confirmar: "Sí, seguir", peligro: true })) void accion("pedido_proveedor_cerrar", p.id, "Pedido cerrado"); }}>Cerrar sin lo que falta</button>}
+          {a.cancelar && <button className="sec" disabled={ocupado} onClick={async () => { if (await confirmar({ titulo: "¿Cancelar este pedido?", confirmar: "Sí, seguir", peligro: true })) void accion("pedido_proveedor_cancelar", p.id, "Pedido cancelado"); }}>Cancelar pedido</button>}
         </div>
       </div>
     );

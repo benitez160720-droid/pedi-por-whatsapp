@@ -66,7 +66,7 @@ export default function Reponer({ kiosco, onComprar }: { kiosco: Kiosco; onCompr
     });
     setOcupado(false);
     if (error) return setMsg(mensajePedido(error.message));
-    setMsg(enviar ? "Pedido guardado como enviado ✔" : "Borrador guardado ✔ Lo encontrás abajo, en Pedidos a proveedores.");
+    setMsg(enviar ? "Pedido guardado como enviado" : "Borrador guardado. Lo encontrás abajo, en Pedidos a proveedores.");
     setRefrescoPedidos((n) => n + 1);
   }
 

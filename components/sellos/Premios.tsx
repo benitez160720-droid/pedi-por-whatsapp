@@ -23,7 +23,7 @@ export default function Premios({ kiosco, premios, productos, onCambio }: { kios
       : await supabase.from("fidelidad_premios").insert({ ...fila, kiosco_id: kiosco.id });
     setOcupado(false);
     if (error) return setMsg(mensajeFidelidad(error.message));
-    setForm(null); setMsg("Premio guardado ✔"); onCambio();
+    setForm(null); setMsg("Premio guardado"); onCambio();
   }
   async function activar(p: Premio) {
     const { error } = await supabase.from("fidelidad_premios").update({ activo: !p.activo }).eq("id", p.id).eq("kiosco_id", kiosco.id);

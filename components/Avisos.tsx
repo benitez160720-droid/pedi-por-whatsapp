@@ -43,7 +43,7 @@ export default function Avisos({ kiosco, soloPendiente = false }: { kiosco: Kios
       );
       if (error) { setMsg("No se pudo guardar el aviso. Probá de nuevo."); return; }
       setEstado("activo");
-      setMsg("Avisos activados en este celular ✔");
+      setMsg("Avisos activados en este celular");
     } catch {
       setMsg("No pudimos activar los avisos en este navegador.");
     }

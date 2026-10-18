@@ -136,7 +136,7 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
     setOcupado(true); setMsg("");
     const ok = await guardarEdiciones();
     setOcupado(false);
-    if (ok) { setMsg("Avance guardado ✔"); await cargar(); }
+    if (ok) { setMsg("Avance guardado"); await cargar(); }
   }
 
   async function verDiferencias() {
@@ -213,8 +213,8 @@ export default function Conteo({ kiosco }: { kiosco: Kiosco }) {
       {msg && <p role="alert" className="pos-error">{msg}</p>}
       {resultado && <p role="status" className="ok">{resultado}</p>}
       <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 8, margin: ".5rem 0" }}>
-        <button className="sec" onClick={() => abrirCamara(!camaraQuiere.current)}>{camara ? "Cerrar cámara" : "📷 Escanear con la cámara"}</button>
-        <button className="sec" onClick={() => { vinculo.vincular(); setVerVinculo(true); }}>📱 {vinculo.estado === "conectado" ? "Celular conectado" : "Usar el celular como lector"}</button>
+        <button className="sec" onClick={() => abrirCamara(!camaraQuiere.current)}>{camara ? "Cerrar cámara" : "Escanear con la cámara"}</button>
+        <button className="sec" onClick={() => { vinculo.vincular(); setVerVinculo(true); }}>{vinculo.estado === "conectado" ? "Celular conectado" : "Usar el celular como lector"}</button>
       </div>
       {camara && <Escaner onCode={alLeerCamara} onClose={() => abrirCamara(false)} />}
       {lectura && <p role="status" className="mut"><b>{lectura}</b></p>}

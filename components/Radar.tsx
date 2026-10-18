@@ -61,7 +61,7 @@ export default function Radar({ kiosco }: { kiosco: Kiosco }) {
   async function crearRegla() {
     const { error } = await supabase.rpc("regla_crear", { p_kiosco: kiosco.id, p_tipo: tipo, p_umbral: Number(umbral.replace(",", ".")) });
     if (error) return setMsg(mensajeErrorSql(error.message));
-    setUmbral(""); setMsg("Aviso guardado ✔"); cargarReglas();
+    setUmbral(""); setMsg("Aviso guardado"); cargarReglas();
   }
   async function alternarRegla(r: Regla) {
     const { error } = await supabase.from("avisos_reglas").update({ activo: !r.activo }).eq("id", r.id);
@@ -71,14 +71,14 @@ export default function Radar({ kiosco }: { kiosco: Kiosco }) {
   async function agregarLote() {
     const { error } = await supabase.rpc("lote_registrar", { p_producto: prodId, p_cantidad: Number(loteCant), p_vence: loteVence });
     if (error) return setMsg(mensajeErrorSql(error.message));
-    setLoteCant(""); setLoteVence(""); setMsg("Lote cargado ✔"); cargarLotes(prodId);
+    setLoteCant(""); setLoteVence(""); setMsg("Lote cargado"); cargarLotes(prodId);
   }
   async function darDeBaja(l: Lote) {
     if (!l.lote_id) return;
     if (!(await confirmar({ titulo: `¿Dar de baja ${l.en_stock} unidad(es) por vencimiento?`, detalle: "Queda registrado como pérdida.", confirmar: "Sí, dar de baja", peligro: true }))) return;
     const { error } = await supabase.rpc("lote_dar_de_baja", { p_lote: l.lote_id, p_cantidad: l.en_stock });
     if (error) return setMsg(mensajeErrorSql(error.message));
-    setMsg("Baja registrada ✔"); cargarLotes(prodId); cargarProductos();
+    setMsg("Baja registrada"); cargarLotes(prodId); cargarProductos();
   }
   async function cerrarLote(l: Lote) {
     if (!l.lote_id) return;

@@ -28,7 +28,7 @@ export default function ResumenSellos({ kiosco }: { kiosco: Kiosco }) {
     const v = vence.trim() === "" ? null : Number(vence);
     if (v !== null && (!Number.isInteger(v) || v < 30 || v > 1095)) return setMsg("El vencimiento tiene que estar entre 30 y 1095 días (o vacío para que no venzan).");
     const { error } = await supabase.from("kioscos").update({ sellos_vencen_dias: v }).eq("id", kiosco.id);
-    setMsg(error ? "No se pudo guardar el vencimiento." : v ? `Los puntos vencen tras ${v} días sin actividad ✔` : "Los puntos no vencen ✔");
+    setMsg(error ? "No se pudo guardar el vencimiento." : v ? `Los puntos vencen tras ${v} días sin actividad` : "Los puntos no vencen");
   }
 
   return (
