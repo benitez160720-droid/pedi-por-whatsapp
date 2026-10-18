@@ -27,7 +27,7 @@ export default function QrKiosco({ slug, nombre }: { slug: string; nombre: strin
         <p className="mut qr-url">{url}</p>
         <div className="qr-acciones">
           <a className="btn" download={`qr-${slug}.png`} href={png}>Descargar QR</a>
-          <button type="button" className="sec" onClick={copiar}>{copiado ? "Link copiado ✔" : "Copiar link"}</button>
+          <button type="button" className="sec" onClick={copiar}>{copiado ? "Link copiado" : "Copiar link"}</button>
         </div>
       </div>
     </div>

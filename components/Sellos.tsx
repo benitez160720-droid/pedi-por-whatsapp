@@ -42,7 +42,7 @@ export default function Sellos({ kiosco }: { kiosco: Kiosco }) {
       <h2>Puntos y premios</h2>
       <p className="mut">Para que los clientes vuelvan: suman puntos con cada compra y se llevan premios cuando juntan suficientes.</p>
       {asistente
-        ? <Asistente kiosco={kiosco} onListo={() => { setAsistente(false); setMsg("Programa guardado ✔"); void cargar(); }} onCancelar={() => setAsistente(false)} />
+        ? <Asistente kiosco={kiosco} onListo={() => { setAsistente(false); setMsg("Programa guardado"); void cargar(); }} onCancelar={() => setAsistente(false)} />
         : <button type="button" className="sec" onClick={() => setAsistente(true)}>Armar programa en 3 pasos</button>}
       <div className="tabs" role="tablist">
         {VISTAS.map(([k, t]) => <button key={k} role="tab" aria-selected={vista === k} className={vista === k ? "" : "sec"} onClick={() => setVista(k)}>{t}</button>)}

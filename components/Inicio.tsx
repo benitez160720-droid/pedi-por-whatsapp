@@ -43,10 +43,10 @@ export default function Inicio({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: Tab
 
     // Lo más urgente primero; máximo 3 tarjetas.
     const lista: Atencion[] = [];
-    if (pendientes > 0) lista.push({ id: "pedidos", tono: "alerta", icono: "🛒", titulo: `${pendientes} pedido${pendientes === 1 ? "" : "s"} por confirmar`, detalle: "Te están esperando por WhatsApp.", ir: "pedidos", boton: "Ver pedidos" });
-    if (agotados + bajos > 0) lista.push({ id: "reponer", tono: "alerta", icono: "📦", titulo: `Se acabó o queda poco: ${agotados + bajos}`, detalle: `${agotados} agotado${agotados === 1 ? "" : "s"} · ${bajos} por acabarse.`, ir: "reponer", boton: "Ver qué comprar" });
-    if (clientesVenc > 0) lista.push({ id: "fiado", tono: "alerta", icono: "💰", titulo: `Fiado vencido: ${peso(montoVenc)}`, detalle: `${clientesVenc} cliente${clientesVenc === 1 ? "" : "s"} debe hace más de 30 días.`, ir: "fiado", boton: "Ver quién me debe" });
-    if (sem.productos > 0 && (dias === null || dias >= 7)) lista.push({ id: "precios", tono: "info", icono: "🏷️", titulo: "Revisá tus precios", detalle: dias === null ? "Todavía no ajustaste precios." : `Hace ${dias} días que no los ajustás.`, ir: "precios", boton: "Cambiar precios" });
+    if (pendientes > 0) lista.push({ id: "pedidos", tono: "alerta", icono: "", titulo: `${pendientes} pedido${pendientes === 1 ? "" : "s"} por confirmar`, detalle: "Te están esperando por WhatsApp.", ir: "pedidos", boton: "Ver pedidos" });
+    if (agotados + bajos > 0) lista.push({ id: "reponer", tono: "alerta", icono: "", titulo: `Se acabó o queda poco: ${agotados + bajos}`, detalle: `${agotados} agotado${agotados === 1 ? "" : "s"} · ${bajos} por acabarse.`, ir: "reponer", boton: "Ver qué comprar" });
+    if (clientesVenc > 0) lista.push({ id: "fiado", tono: "alerta", icono: "", titulo: `Fiado vencido: ${peso(montoVenc)}`, detalle: `${clientesVenc} cliente${clientesVenc === 1 ? "" : "s"} debe hace más de 30 días.`, ir: "fiado", boton: "Ver quién me debe" });
+    if (sem.productos > 0 && (dias === null || dias >= 7)) lista.push({ id: "precios", tono: "info", icono: "", titulo: "Revisá tus precios", detalle: dias === null ? "Todavía no ajustaste precios." : `Hace ${dias} días que no los ajustás.`, ir: "precios", boton: "Cambiar precios" });
     setAtencion(lista.slice(0, 3));
 
     const plata = (hoy.data ?? []).filter((p) => p.estado !== "cancelado").reduce((s, p) => s + Number(p.total), 0);
@@ -83,7 +83,7 @@ export default function Inicio({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: Tab
     <Pantalla titulo={`Hola, ${kiosco.nombre}`}>
       <div className="card row">
         <span>Compartí tu tienda con tus clientes.</span>
-        <button type="button" onClick={copiarLink}>{copiado ? "Link copiado ✔" : "Compartir mi tienda"}</button>
+        <button type="button" onClick={copiarLink}>{copiado ? "Link copiado" : "Compartir mi tienda"}</button>
       </div>
 
       {error && <Aviso tipo="error">No pudimos cargar lo de hoy. Revisá tu conexión y recargá la página.</Aviso>}
@@ -93,7 +93,7 @@ export default function Inicio({ kiosco, onIr }: { kiosco: Kiosco; onIr: (t: Tab
       {sinNada && <Aviso tipo="ok">Todo en orden. No hay nada urgente hoy.</Aviso>}
       {atencion?.map((a) => (
         <div key={a.id} className="card">
-          <b>{a.icono} {a.titulo}</b>
+          <b>{a.titulo}</b>
           <p className="mut">{a.detalle}</p>
           <button type="button" onClick={() => onIr(a.ir)}>{a.boton}</button>
         </div>

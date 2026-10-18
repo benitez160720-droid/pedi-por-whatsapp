@@ -200,7 +200,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
     const partes: string[] = [];
     if (pre) {
       const { error: e } = await supabase.rpc("fidelidad_canjear", { p_cliente: cli.id, p_premio: pre.id, p_venta: ventaId });
-      partes.push(e ? `⚠ No se pudo descontar el canje de "${pre.nombre}" (${mensajeFidelidad(e.message)}). Hacelo desde Sellos.` : `Canje: ${pre.nombre}${pre.tipo === "libre" ? " — entregalo al cliente" : ""}.`);
+      partes.push(e ? ` No se pudo descontar el canje de "${pre.nombre}" (${mensajeFidelidad(e.message)}). Hacelo desde Sellos.` : `Canje: ${pre.nombre}${pre.tipo === "libre" ? " — entregalo al cliente" : ""}.`);
     }
     const g = await supabase.from("sellos").select("cantidad").eq("venta_id", ventaId).eq("anulado", false);
     const ganados = (g.data ?? []).reduce((a, x) => a + Number(x.cantidad), 0);
@@ -221,7 +221,7 @@ export default function PosVenta({ kiosco, turno, productos, favoritos, clientes
       const vuelto = Math.max(0, Math.round((pagos.reduce((a, p) => a + p.monto, 0) - tot.total) * 100) / 100);
       const t = armarTicket(0, { subtotal: tot.subtotal, descuento: tot.descuento, total: tot.total, vuelto: efectivo > 0 ? vuelto : 0 }, pagos, true);
       setTicket(t); void salidaVenta(t, pagos);
-      if (premioVenta) setAvisoFid(`⚠ La venta quedó pendiente de sincronizar: canjeá "${premioVenta.nombre}" desde Puntos y premios cuando vuelva internet.`);
+      if (premioVenta) setAvisoFid(` La venta quedó pendiente de sincronizar: canjeá "${premioVenta.nombre}" desde Puntos y premios cuando vuelva internet.`);
       refrescarCola(); terminarVenta();
     };
     if (!navigator.onLine) { guardarSinConexion(); return null; }

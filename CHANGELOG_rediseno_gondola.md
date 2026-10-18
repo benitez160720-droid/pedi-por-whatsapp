@@ -11,4 +11,4 @@ Archivos: app/globals.css (reescrito), app/layout.tsx, app/page.tsx, components/
 - Portada: cinta de señalización al pie, muestra de pedido armada con CSS.
 - Panel: menú lateral oscuro con marca amarilla en el ítem activo; barra inferior en celular.
 - Accesibilidad mantenida: texto base 18 px, objetivos de 48 px, foco con doble anillo, sin mayúsculas sostenidas.
-- Cero emojis. Se mantienen los 18 tests y typecheck limpio.
+- Emojis: se quitaron también los que habían quedado en los componentes (carrito, caja, ccámara, regalo, etc.). Quedan solo símbolos de texto neutros (✔ ✕ ○) en listas y botones de cerrar. Se mantienen los 18 tests y typecheck limpio.

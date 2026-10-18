@@ -120,7 +120,7 @@ export default function Pedidos({ kiosco }: { kiosco: Kiosco }) {
     const { data, error: err } = await supabase.rpc("pasar_a_fiado", { p_pedido: p.id });
     if (err) { setError(ERRORES_FIADO[Object.keys(ERRORES_FIADO).find((k) => err.message.includes(k)) ?? ""] ?? "No se pudo anotar el fiado. Probá de nuevo."); return; }
     const saldo = Number((data as { saldo: number }).saldo);
-    setAviso(`${(data as { ya_estaba: boolean }).ya_estaba ? "Ya estaba anotado" : "Anotado en Fiado ✔"} · ${p.cliente_nombre} debe ${peso(saldo)} en total.`);
+    setAviso(`${(data as { ya_estaba: boolean }).ya_estaba ? "Ya estaba anotado" : "Anotado en Fiado"} · ${p.cliente_nombre} debe ${peso(saldo)} en total.`);
     cargar();
   }
   async function quitarFiado(p: PedidoConItems) {

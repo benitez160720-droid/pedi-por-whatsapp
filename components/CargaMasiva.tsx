@@ -56,7 +56,7 @@ export default function CargaMasiva({ kiosco, existentes, onListo, onCerrar }: {
         return;
       }
     }
-    setGuardando(false); setPrecios({}); setTexto(""); setMsg(`Listo ✔ ${filas.length} productos cargados`); onListo();
+    setGuardando(false); setPrecios({}); setTexto(""); setMsg(`Listo. ${filas.length} productos cargados`); onListo();
   }
 
   return (
@@ -71,7 +71,7 @@ export default function CargaMasiva({ kiosco, existentes, onListo, onCerrar }: {
       {modo === "kit" && (
         <>
           <p className="mut">Poné el precio solo de lo que vendés; los vacíos no se cargan. Podés editarlos después. Cigarrillos y alcohol se cargan a mano.</p>
-          {kit.length === 0 && <p className="mut">Ya tenés todo el kit cargado. 🎉</p>}
+          {kit.length === 0 && <p className="mut">Ya tenés todo el kit cargado.</p>}
           {kit.map(([cat, items]) => (
             <section key={cat}>
               <h2>{cat}</h2>

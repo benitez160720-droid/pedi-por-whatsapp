@@ -46,7 +46,7 @@ export default function Fiado({ kiosco }: { kiosco: Kiosco }) {
     if (!(m > 0)) { setMsg("Poné un monto mayor a cero."); return; }
     const { error: err } = await supabase.from("fiado_movimientos").insert({ kiosco_id: kiosco.id, cliente_id: c.id, tipo, monto: m });
     if (err) { setMsg("No se pudo guardar. Probá de nuevo."); return; }
-    setMonto(""); setMsg(tipo === "fiado" ? "Anotado ✔" : "Pago cobrado ✔");
+    setMonto(""); setMsg(tipo === "fiado" ? "Anotado" : "Pago cobrado");
     await cargar();
     const { data } = await supabase.from("fiado_movimientos").select("id,tipo,monto,created_at,nota").eq("cliente_id", c.id).order("created_at", { ascending: false }).limit(10);
     setMovs((data ?? []) as Mov[]);
@@ -55,14 +55,14 @@ export default function Fiado({ kiosco }: { kiosco: Kiosco }) {
   async function nuevo() {
     const { error: err } = await supabase.from("clientes").insert({ kiosco_id: kiosco.id, nombre: nNombre.trim(), telefono: normalizarTelefonoAR(nTel) });
     if (err) { setMsg(err.code === "23505" ? "Ya tenés un cliente con ese teléfono." : "No se pudo crear el cliente."); return; }
-    setNNombre(""); setNTel(""); setSoloDeuda(false); setMsg("Cliente creado ✔"); cargar();
+    setNNombre(""); setNTel(""); setSoloDeuda(false); setMsg("Cliente creado"); cargar();
   }
 
   async function borrar(c: Cli) {
     if (!(await confirmar({ titulo: `¿Borrar a ${c.nombre} de la libreta?`, detalle: "Se pierden su fiado, sus puntos y su historial. Los pedidos se conservan.", confirmar: "Sí, borrar cliente", peligro: true }))) return;
     const { error: err } = await supabase.rpc("borrar_cliente", { p_cliente: c.id });
     if (err) { setMsg("No se pudo borrar el cliente."); return; }
-    setAbierto(null); setMsg("Cliente borrado ✔");
+    setAbierto(null); setMsg("Cliente borrado");
     await cargar();
   }
 

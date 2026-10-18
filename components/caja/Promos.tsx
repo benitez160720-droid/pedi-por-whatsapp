@@ -122,7 +122,7 @@ export default function Promos({ kiosco, productos, promos, onCambio }: { kiosco
             <div className="row"><b>{p.nombre}</b><span className="chip-estado">{estado}</span></div>
             <p className="mut" style={{ margin: ".2rem 0" }}>
               {describirPromo(p, nombreProd)}{p.desde || p.hasta ? ` · ${p.desde ? `desde ${p.desde}` : ""}${p.desde && p.hasta ? " " : ""}${p.hasta ? `hasta ${p.hasta}` : ""}` : ""}
-              {p.tipo === "nxm" && p.producto_id && porPeso(p.producto_id) ? " · ⚠ el producto se vende por peso: el NxM no aplica" : ""}
+              {p.tipo === "nxm" && p.producto_id && porPeso(p.producto_id) ? " ·  el producto se vende por peso: el NxM no aplica" : ""}
             </p>
             <div className="pos-venta-acc">
               <button className="sec" onClick={() => alternar(p)}>{p.activa ? "Pausar" : "Activar"}</button>

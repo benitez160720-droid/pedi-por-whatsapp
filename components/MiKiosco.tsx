@@ -39,7 +39,7 @@ export default function MiKiosco({ kiosco, onGuardado, modo, onModo, onVerBienve
     }).eq("id", kiosco.id);
     setGuardando(false);
     if (error) { setOk(false); setMsg("No se pudo guardar. Revisá los datos."); return; }
-    setOk(true); setMsg("Guardado ✔"); onGuardado();
+    setOk(true); setMsg("Guardado"); onGuardado();
   }
 
   return (
