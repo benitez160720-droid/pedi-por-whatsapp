@@ -618,3 +618,9 @@ button.pos-x { min-height: 36px; width: 36px; padding: 0; }
   #etiquetas-imprimible .etq-item { border: none; }
 }
 
+
+/* Arreglo: botones de precio y Hay dentro de .qty */
+.qty button, .qty button.sec { width: auto; min-width: 44px; padding: 0 .75rem; font-size: 1.1rem; white-space: nowrap; }
+.qty button.sec { font-variant-numeric: tabular-nums; }
+.pos-linea .qty button { width: 36px; min-width: 36px; padding: 0; }
+@media (max-width: 560px) { .row:has(> .qty) { flex-wrap: wrap; } .row > .qty { margin-left: auto; } }
